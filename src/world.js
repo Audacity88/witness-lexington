@@ -1,0 +1,569 @@
+/* Witness the First Shot — 3D world: Lexington Green (refactored from witness.js v2.1 buildLexington)
+   and the low-poly globe (from witness.js v2.1's geographic transition). Classic script; needs
+   window.THREE (three r186 + OrbitControls) and window.WG_COAST_B64. Defines window.WGWorld. */
+(function () {
+  'use strict';
+  var T = window.THREE;
+  if (!T || !T.OrbitControls) throw new Error('Witness Game: window.THREE with OrbitControls not loaded');
+  var TAU = Math.PI * 2, D2R = Math.PI / 180;
+
+  // seeded RNG so every run (and every screenshot) is laid out identically
+  var seed = 1775;
+  function rand() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+  function rnd(a, b) { return a + rand() * (b - a); }
+  function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+  function ease(x) { x = clamp01(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
+  function lerp(a, b, k) { return a + (b - a) * k; }
+
+  function create(host) {
+    var renderer = new T.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
+    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
+    var cv = renderer.domElement;
+    cv.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%;touch-action:none';
+    host.appendChild(cv);
+
+    // ---------- shared helpers (from v2.1) ----------
+    var matCache = {};
+    function mat(hex, extra) {
+      var k = hex + (extra ? JSON.stringify(extra) : '');
+      if (!matCache[k]) { var o = { color: hex, roughness: 0.85, metalness: 0.05, flatShading: true };
+        if (extra) for (var p in extra) o[p] = extra[p]; matCache[k] = new T.MeshStandardMaterial(o); }
+      return matCache[k];
+    }
+    function mesh(geo, m, cast, recv) { var x = new T.Mesh(geo, m); x.castShadow = cast !== false; x.receiveShadow = !!recv; return x; }
+    function gable(len, span, h) {
+      var sh = new T.Shape(); sh.moveTo(-span / 2, 0); sh.lineTo(span / 2, 0); sh.lineTo(0, h); sh.lineTo(-span / 2, 0);
+      var g = new T.ExtrudeGeometry(sh, { depth: len, bevelEnabled: false }); g.translate(0, 0, -len / 2); g.rotateY(Math.PI / 2); return g;
+    }
+    var VCM = new T.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85, metalness: 0.05 });
+    function bake(root) {
+      root.updateMatrixWorld(true);
+      var inv = new T.Matrix4().copy(root.matrixWorld).invert(), list = [], m4 = new T.Matrix4();
+      (function walk(o) { for (var i = 0; i < o.children.length; i++) { var c = o.children[i]; if (c.userData.dyn) continue;
+        if (c.isMesh && !c.isInstancedMesh && !c.userData.keep && c.material && c.material.isMeshStandardMaterial && !c.material.transparent && !c.material.vertexColors) list.push(c);
+        walk(c); } })(root);
+      if (!list.length) return;
+      var parts = [], total = 0;
+      list.forEach(function (c) {
+        var g = c.geometry.index ? c.geometry.toNonIndexed() : c.geometry.clone();
+        for (var k in g.attributes) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+        if (!g.attributes.normal) g.computeVertexNormals();
+        g.applyMatrix4(m4.multiplyMatrices(inv, c.matrixWorld));
+        parts.push({ g: g, c: c.material.color }); total += g.attributes.position.count;
+      });
+      var P = new Float32Array(total * 3), N = new Float32Array(total * 3), C = new Float32Array(total * 3), o = 0;
+      parts.forEach(function (pt) { var pa = pt.g.attributes.position.array, na = pt.g.attributes.normal.array;
+        P.set(pa, o * 3); N.set(na, o * 3); for (var i = 0, n = pa.length / 3; i < n; i++) { C[(o + i) * 3] = pt.c.r; C[(o + i) * 3 + 1] = pt.c.g; C[(o + i) * 3 + 2] = pt.c.b; }
+        o += pa.length / 3; pt.g.dispose(); });
+      var mg = new T.BufferGeometry();
+      mg.setAttribute('position', new T.BufferAttribute(P, 3)); mg.setAttribute('normal', new T.BufferAttribute(N, 3)); mg.setAttribute('color', new T.BufferAttribute(C, 3));
+      mg.computeBoundingSphere();
+      list.forEach(function (c) { c.parent.remove(c); });
+      var merged = new T.Mesh(mg, VCM); merged.castShadow = true; merged.receiveShadow = true; root.add(merged);
+    }
+    function bakeAll(g) { bake(g); (function walk(o) { o.children.slice().forEach(function (c) { if (c.userData.dyn) { bake(c); } else if (c.isGroup) walk(c); }); })(g); }
+    function skyDome(top, mid, horizon) {
+      var g = new T.SphereGeometry(400, 32, 16), pos = g.attributes.position, cols = [], c = new T.Color();
+      var cT = new T.Color(top), cM = new T.Color(mid), cH = new T.Color(horizon);
+      for (var i = 0; i < pos.count; i++) { var h = pos.getY(i) / 400;
+        if (h < 0) c.copy(cH); else if (h < 0.25) c.copy(cH).lerp(cM, h / 0.25); else c.copy(cM).lerp(cT, (h - 0.25) / 0.75);
+        cols.push(c.r, c.g, c.b); }
+      g.setAttribute('color', new T.Float32BufferAttribute(cols, 3));
+      var m = new T.Mesh(g, new T.MeshBasicMaterial({ vertexColors: true, side: T.BackSide, fog: false, depthWrite: false }));
+      m.renderOrder = -1; return m;
+    }
+    function glowTex(inner, mid, outer) {
+      var c = document.createElement('canvas'); c.width = c.height = 128; var x = c.getContext('2d');
+      var g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+      g.addColorStop(0, inner); g.addColorStop(0.18, mid); g.addColorStop(0.45, outer); g.addColorStop(1, 'rgba(255,140,60,0)');
+      x.fillStyle = g; x.fillRect(0, 0, 128, 128); var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; return t;
+    }
+    var GLOW = glowTex('rgba(255,250,235,1)', 'rgba(255,225,160,.95)', 'rgba(255,170,90,.35)');
+    function sun(dir, size) {
+      var s = new T.Sprite(new T.SpriteMaterial({ map: GLOW, fog: false, depthWrite: false, transparent: true, blending: T.AdditiveBlending }));
+      s.position.copy(dir).normalize().multiplyScalar(350); s.scale.set(size, size, 1); return s;
+    }
+    function lights(group, skyCol, groundCol, hemiI, sunCol, sunI, sunPos, extent) {
+      group.add(new T.HemisphereLight(skyCol, groundCol, hemiI));
+      var d = new T.DirectionalLight(sunCol, sunI); d.position.copy(sunPos); d.castShadow = true;
+      d.shadow.mapSize.set(1024, 1024); d.shadow.bias = -0.0006; d.shadow.normalBias = 0.02;
+      var sc = d.shadow.camera; sc.left = -extent; sc.right = extent; sc.top = extent; sc.bottom = -extent; sc.near = 1; sc.far = 220;
+      group.add(d); group.add(d.target);
+    }
+    function terrain(w, d, segW, segD, color, heightFn) {
+      var g = new T.PlaneGeometry(w, d, segW, segD); g.rotateX(-Math.PI / 2);
+      var p = g.attributes.position;
+      for (var i = 0; i < p.count; i++) p.setY(i, heightFn(p.getX(i), p.getZ(i)));
+      g.computeVertexNormals(); return mesh(g, mat(color), false, true);
+    }
+
+    // ---------- low-poly people (v2.1) ----------
+    var G = {
+      leg: new T.BoxGeometry(0.13, 0.75, 0.14).translate(0, -0.375, 0),
+      torso: new T.BoxGeometry(0.42, 0.62, 0.26), coatTail: new T.BoxGeometry(0.44, 0.22, 0.28),
+      arm: new T.BoxGeometry(0.11, 0.58, 0.12).translate(0, -0.27, 0), head: new T.IcosahedronGeometry(0.15, 0),
+      tricorne: new T.ConeGeometry(0.26, 0.14, 3), roundHat: new T.CylinderGeometry(0.26, 0.26, 0.04, 8),
+      roundCrown: new T.CylinderGeometry(0.13, 0.15, 0.14, 8), bonnet: new T.SphereGeometry(0.19, 8, 4, 0, TAU, 0, Math.PI / 2),
+      musket: new T.BoxGeometry(0.05, 1.25, 0.05), belt: new T.BoxGeometry(0.44, 0.07, 0.27), pack: new T.BoxGeometry(0.32, 0.36, 0.14),
+      skirt: new T.CylinderGeometry(0.2, 0.34, 0.8, 7)
+    };
+    var SKIN = [0xe0b48f, 0xc99a73, 0xa97a55, 0xd7a985, 0x8d5e3c];
+    function person(o) {
+      var g = new T.Group(), legs = [];
+      if (o.skirt) { var sk = mesh(G.skirt, mat(o.pants)); sk.position.y = 0.4; g.add(sk); }
+      for (var s = -1; s <= 1; s += 2) { var l = mesh(G.leg, mat(o.pants)); l.position.set(s * 0.1, 0.78, 0); l.userData.keep = true; if (o.skirt) l.visible = false; g.add(l); legs.push(l); }
+      var torso = mesh(G.torso, mat(o.coat)); torso.position.y = 1.1; g.add(torso);
+      if (o.tails) { var ct = mesh(G.coatTail, mat(o.coat)); ct.position.set(0, 0.72, -0.01); g.add(ct); }
+      if (o.belts) { var b = mesh(G.belt, mat(o.belts)); b.position.y = 1.18; b.rotation.z = 0.7; g.add(b);
+        var b2 = mesh(G.belt, mat(o.belts)); b2.position.y = 1.18; b2.rotation.z = -0.7; g.add(b2); }
+      if (o.pack) { var pk = mesh(G.pack, mat(o.pack)); pk.position.set(0, 1.12, -0.2); g.add(pk); }
+      for (s = -1; s <= 1; s += 2) { var a = mesh(G.arm, mat(o.coat)); a.position.set(s * 0.27, 1.38, 0); a.rotation.x = s > 0 ? -0.35 : 0.1; g.add(a); }
+      var head = mesh(G.head, mat(SKIN[(rand() * SKIN.length) | 0])); head.position.y = 1.58; g.add(head);
+      var hat;
+      if (o.hat === 'tricorne') { hat = mesh(G.tricorne, mat(o.hatColor || 0x1b1b1b)); hat.position.y = 1.74; hat.rotation.y = Math.PI / 3; }
+      else if (o.hat === 'round') { hat = new T.Group(); hat.add(mesh(G.roundHat, mat(o.hatColor))); var cr = mesh(G.roundCrown, mat(o.hatColor)); cr.position.y = 0.08; hat.add(cr); hat.position.y = 1.7; }
+      else if (o.hat === 'bonnet') { hat = mesh(G.bonnet, mat(o.hatColor || 0xe8e0cc)); hat.position.y = 1.6; }
+      if (hat) g.add(hat);
+      if (o.musket) { var m = mesh(G.musket, mat(0x4a3420)); m.position.set(0.3, 1.45, 0.08); m.rotation.x = -0.25; m.rotation.z = -0.12; g.add(m); }
+      g.userData.legs = legs; g.userData.phase = rand() * TAU;
+      return g;
+    }
+    function walkLegs(p, t, speed, amp) { var a = Math.sin(t * speed + p.userData.phase) * (amp || 0.45); p.userData.legs[0].rotation.x = a; p.userData.legs[1].rotation.x = -a; }
+    function standLegs(p) { p.userData.legs[0].rotation.x = p.userData.legs[1].rotation.x = 0; }
+    function kneel(p, k) {             // k 0..1: lower onto one knee (no falling, no gore)
+      p.position.y -= 0.42 * k; p.userData.legs[0].rotation.x = -1.35 * k; p.userData.legs[1].rotation.x = 1.0 * k; p.rotation.x = 0.12 * k;
+    }
+
+    // ---------- effects: smoke + muzzle flashes ----------
+    var PUFF = new T.IcosahedronGeometry(0.5, 1);
+    var FLASH = glowTex('rgba(255,255,240,1)', 'rgba(255,236,170,.95)', 'rgba(255,170,80,.4)');
+    function fxPool(group, n) {
+      var pool = [], fl = [];
+      for (var i = 0; i < n; i++) {
+        var m = new T.Mesh(PUFF, new T.MeshStandardMaterial({ color: 0xe4e0d8, emissive: 0x6d6a64, roughness: 1, transparent: true, opacity: 0, depthWrite: false, flatShading: true }));
+        m.visible = false; group.add(m); pool.push({ m: m, life: 0, max: 1, v: new T.Vector3(), size: 1 });
+      }
+      for (i = 0; i < 28; i++) {
+        var s = new T.Sprite(new T.SpriteMaterial({ map: FLASH, transparent: true, depthWrite: false, blending: T.AdditiveBlending }));
+        s.visible = false; group.add(s); fl.push({ s: s, life: 0 });
+      }
+      function puff(pos, size, drift) {
+        for (var i = 0; i < pool.length; i++) if (pool[i].life <= 0) {
+          var p = pool[i]; p.life = p.max = rnd(3, 5); p.size = size || 1; p.m.position.copy(pos);
+          p.v.set(rnd(0.2, 0.6), rnd(0.15, 0.35), rnd(-0.2, 0.2)); if (drift) p.v.add(drift); p.m.visible = true; return;
+        }
+      }
+      return {
+        shot: function (pos, dir, big) {          // a muzzle flash + a puff of smoke just in front of the muzzle
+          for (var i = 0; i < fl.length; i++) if (fl[i].life <= 0) { var f = fl[i]; f.life = 0.3; f.s.position.copy(pos); f.big = big ? 3.4 : 1.9; f.s.visible = true; break; }
+          var p2 = pos.clone(); if (dir) p2.addScaledVector(dir, 0.5);
+          puff(p2, big ? 1.4 : 1.0, dir ? dir.clone().multiplyScalar(0.6) : null);
+        },
+        puff: puff,
+        update: function (dt) {
+          for (var i = 0; i < pool.length; i++) { var p = pool[i]; if (p.life <= 0) continue; p.life -= dt;
+            var k = 1 - p.life / p.max; p.m.position.addScaledVector(p.v, dt);
+            p.m.scale.setScalar(p.size * (0.35 + k * 1.7)); p.m.material.opacity = 0.7 * (1 - k) * Math.min(1, k * 8);
+            if (p.life <= 0) p.m.visible = false; }
+          for (i = 0; i < fl.length; i++) { var f = fl[i]; if (f.life <= 0) continue; f.life -= dt;
+            var s = f.big * (0.6 + 0.4 * (f.life / 0.3)); f.s.scale.set(s, s, 1); f.s.material.opacity = clamp01(f.life / 0.3);
+            if (f.life <= 0) f.s.visible = false; }
+        },
+        clear: function () { pool.forEach(function (p) { p.life = 0; p.m.visible = false; }); fl.forEach(function (f) { f.life = 0; f.s.visible = false; }); }
+      };
+    }
+
+    // ---------- label sprite ----------
+    function labelSprite(text, bg, fg) {
+      var c = document.createElement('canvas'); c.width = 512; c.height = 96; var x = c.getContext('2d');
+      x.font = '700 44px system-ui,-apple-system,Segoe UI,Roboto,sans-serif'; var w = Math.min(500, x.measureText(text).width + 44);
+      x.fillStyle = bg || 'rgba(8,12,26,.78)'; x.beginPath(); if (x.roundRect) x.roundRect((512 - w) / 2, 10, w, 76, 22); else x.rect((512 - w) / 2, 10, w, 76); x.fill();
+      x.fillStyle = fg || '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 256, 50);
+      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace;
+      var sp = new T.Sprite(new T.SpriteMaterial({ map: t, depthTest: false, transparent: true, fog: false })); sp.renderOrder = 10; return sp;
+    }
+
+    // ======================= Lexington Green (instance) =======================
+    // Geography (scene units ~ metres-ish, not to scale): the road comes in from +z; the Green is a disc at the origin.
+    var LINE = {
+      regFront: { z: 9, x0: -6, dx: 2 }, regBack: { z: 10.6 },
+      milFront: { z: -3, x0: -8, dx: 1.9 }, milBack: { z: -4.6 },
+      zones: {
+        front:   { kind: 'line', z: 7.2, x0: -6, x1: 10 },
+        between: { kind: 'line', z: 2.6, x0: -6, x1: 10 },
+        ranks:   { kind: 'line', z: -3.8, x0: -8, x1: 7.2 },
+        wall:    { kind: 'spot', x: -17.3, z: -6.5 },
+        house:   { kind: 'spot', x: 18.4, z: -6.4 }
+      }
+    };
+    function head(t) { return lerp(64, 21, ease((t - 6.6) / 7.6)); }      // column head z during the march (cutscene time)
+
+    function makeLex() {
+      seed = 1775;                                      // identical layout for every instance
+      var scene = new T.Scene(); scene.fog = new T.Fog(0xe6b99c, 40, 190);
+      var g = new T.Group(); scene.add(g);
+      g.add(skyDome(0x3d4f7c, 0xd99a8a, 0xffc98f));
+      var sunDir = new T.Vector3(-1, 0.12, -0.55);
+      g.add(sun(sunDir, 120));
+      lights(g, 0xc6cdef, 0x6a6040, 1.3, 0xffbd7a, 2.6, sunDir.clone().multiplyScalar(60), 42);
+      g.add(terrain(240, 240, 44, 44, 0x5f7a3a, function (x, z) {
+        var r = Math.sqrt(x * x + z * z); return r < 30 ? (rand() - 0.5) * 0.08 : (r - 30) * 0.04 * (1 + Math.sin(x * 0.07) * Math.cos(z * 0.09)) + (rand() - 0.5) * 0.6;
+      }));
+      var green = mesh(new T.CircleGeometry(22, 9).rotateX(-Math.PI / 2), mat(0x6f8d43), false, true); green.position.y = 0.05; g.add(green);
+      var road = mesh(new T.PlaneGeometry(4.5, 110).rotateX(-Math.PI / 2), mat(0x8a7354), false, true); road.position.set(2.5, 0.07, 66); g.add(road);
+      // meetinghouse
+      var mh = new T.Group(); mh.position.set(-12, 0, -17); mh.rotation.y = 0.25;
+      var body = mesh(new T.BoxGeometry(10, 5.5, 7), mat(0xe9e3d3), true, true); body.position.y = 2.75; mh.add(body);
+      var roof = mesh(gable(10.8, 7.8, 3.2), mat(0x5b4a3e)); roof.position.y = 5.5; mh.add(roof);
+      var tower = mesh(new T.BoxGeometry(2.4, 3.2, 2.4), mat(0xe9e3d3)); tower.position.set(0, 9.2, 0); mh.add(tower);
+      var spire = mesh(new T.ConeGeometry(1.5, 4.2, 4), mat(0x5b4a3e)); spire.position.set(0, 12.9, 0); spire.rotation.y = Math.PI / 4; mh.add(spire);
+      for (var w = -3; w <= 3; w += 2) { var win = mesh(new T.BoxGeometry(0.9, 1.4, 0.1), mat(0x2d3440), false); win.position.set(w * 1.3, 3, 3.52); mh.add(win); }
+      var door = mesh(new T.BoxGeometry(1.4, 2.4, 0.1), mat(0x4a3a2a), false); door.position.set(0, 1.2, 3.53); mh.add(door);
+      g.add(mh);
+      // houses around the Green
+      [[-25, 7, 0.6, 0x7a4b3a], [22.5, -10, -0.4, 0xd9cfb8], [-21, 24, 1.1, 0x5e6b73], [25, 18, -1.2, 0x8c5a3c], [12, -24, 0.1, 0xb8a585]].forEach(function (h) {
+        var hg = new T.Group(); hg.position.set(h[0], 0, h[1]); hg.rotation.y = h[2];
+        var hb = mesh(new T.BoxGeometry(7, 4, 5), mat(h[3]), true, true); hb.position.y = 2; hg.add(hb);
+        var hr = mesh(gable(7.6, 5.8, 2.4), mat(0x3f3a36)); hr.position.y = 4; hg.add(hr);
+        var ch = mesh(new T.BoxGeometry(0.8, 2.4, 0.8), mat(0x6b4b3b)); ch.position.set(2.2, 5.4, 0); hg.add(ch);
+        for (var k = -1; k <= 1; k += 2) { var wi = mesh(new T.BoxGeometry(0.9, 1, 0.1), mat(0x2d3440), false); wi.position.set(k * 1.8, 2.3, 2.53); hg.add(wi); }
+        g.add(hg);
+      });
+      // a low fieldstone wall along the west edge of the Green
+      for (var sx = 0; sx < 14; sx++) {
+        var stn = mesh(new T.BoxGeometry(rnd(0.7, 0.95), rnd(0.75, 1.05), rnd(0.7, 0.95)), mat([0x8d8a84, 0x77746e, 0x9b968c][sx % 3]), true, true);
+        stn.position.set(-16 + rnd(-0.08, 0.08), 0.42, -12.5 + sx * 0.85); stn.rotation.y = rnd(-0.2, 0.2); g.add(stn);
+        var cap = mesh(new T.BoxGeometry(rnd(0.5, 0.8), 0.35, rnd(0.5, 0.75)), mat(0x84817a), true, true);
+        cap.position.set(-16 + rnd(-0.1, 0.1), 1.0, -12.3 + sx * 0.85); g.add(cap);
+      }
+      // trees
+      for (var i = 0; i < 50; i++) {
+        var a = rnd(0, TAU), r = rnd(32, 80), tx = Math.cos(a) * r, tz = Math.sin(a) * r;
+        if (Math.abs(tx - 2.5) < 7 && tz > 0) continue;
+        var tr = new T.Group(); tr.position.set(tx, (r - 30) * 0.04, tz);
+        var trunk = mesh(new T.CylinderGeometry(0.25, 0.35, 2, 5), mat(0x4b3621)); trunk.position.y = 1; tr.add(trunk);
+        var crown = mesh(new T.ConeGeometry(rnd(1.8, 2.8), rnd(4.5, 7), 6), mat([0x2f4a26, 0x3a5a2c, 0x5a6b2c][i % 3])); crown.position.y = 4.4; tr.add(crown);
+        tr.scale.setScalar(rnd(0.8, 1.3)); g.add(tr);
+      }
+      // spectators (static): a few townspeople at the edges, watching
+      [[-19.5, 3.2, 1.9, 0], [-20.6, 9, 2.3, 1], [17.6, -5.4, -1.6, 0], [19.4, -13.2, -1.1, 1], [-7.5, -12.6, 0.4, 0], [14, 14, -2.4, 0]].forEach(function (s, k) {
+        var p = person(s[3] ? { coat: 0x7b5b6a, pants: 0x6a5b70, skirt: true, hat: 'bonnet', hatColor: 0xece4d0 }
+                             : { coat: [0x5d5148, 0x6e6a58, 0x46505c][k % 3], pants: 0x5b5246, hat: 'round', hatColor: 0x2c241c });
+        p.position.set(s[0], 0.05, s[1]); p.rotation.y = s[2]; g.add(p);
+      });
+      // militia: two ranks on the Green, facing the road (+z)
+      var militia = [], coats = [0x6b4a2f, 0x4f5a45, 0x4a5568, 0x8a6f4a, 0x5a3d2b, 0x3e4a5c];
+      for (var rnk = 0; rnk < 2; rnk++) for (var k = 0; k < 9; k++) {
+        var m = person({ coat: coats[(k + rnk * 3) % coats.length], pants: [0xc8b48a, 0x6d5a45, 0x8b7d6b][k % 3],
+          hat: (k + rnk) % 3 ? 'round' : 'tricorne', hatColor: (k % 2) ? 0x3b2f22 : 0x1e1e1e, musket: true });
+        m.userData.dyn = true;
+        m.userData.base = new T.Vector3(LINE.milFront.x0 + k * LINE.milFront.dx + rnd(-0.25, 0.25) + rnk * 0.5, 0.05, (rnk ? LINE.milBack.z : LINE.milFront.z) + rnd(-0.2, 0.2));
+        m.userData.rotY = 0.12 + rnd(-0.15, 0.15); m.userData.rank = rnk; m.userData.k = k;
+        g.add(m); militia.push(m);
+      }
+      // British regulars: 12 rows of three; the first 6 rows are the advance companies that wheel onto the Green
+      var regs = [];
+      for (var row = 0; row < 12; row++) for (var col = 0; col < 3; col++) {
+        var rg = person({ coat: 0xb3262b, pants: 0xe8e2d0, tails: true, belts: 0xf2efe6, pack: 0x5a4632, hat: 'tricorne', musket: true });
+        rg.userData.dyn = true; rg.userData.row = row; rg.userData.col = col; rg.userData.adv = row < 6;
+        var idx = row * 3 + col;
+        if (row < 6) { var slot = idx; rg.userData.slot = { x: LINE.regFront.x0 + (slot % 9) * LINE.regFront.dx, z: slot < 9 ? LINE.regFront.z : LINE.regBack.z, front: slot < 9 }; }
+        g.add(rg); regs.push(rg);
+      }
+      // mounted officer
+      var horse = new T.Group();
+      var hbody = mesh(new T.BoxGeometry(0.8, 0.9, 2.2), mat(0x3b2a1e)); hbody.position.y = 1.5; horse.add(hbody);
+      var hneck = mesh(new T.BoxGeometry(0.45, 1.1, 0.5), mat(0x3b2a1e)); hneck.position.set(0, 2.1, -1.05); hneck.rotation.x = 0.5; horse.add(hneck);
+      var hhead = mesh(new T.BoxGeometry(0.38, 0.4, 0.8), mat(0x3b2a1e)); hhead.position.set(0, 2.55, -1.45); horse.add(hhead);
+      var hlegs = [];
+      [[-0.28, -0.85], [0.28, -0.85], [-0.28, 0.85], [0.28, 0.85]].forEach(function (p) { var l = mesh(G.leg, mat(0x2e2016)); l.scale.set(1.3, 1.4, 1.3); l.position.set(p[0], 1.1, p[1]); l.userData.keep = true; horse.add(l); hlegs.push(l); });
+      var rider = person({ coat: 0xb3262b, pants: 0xe8e2d0, tails: true, hat: 'tricorne' }); rider.position.y = 1.15; rider.rotation.y = Math.PI; rider.userData.legs.forEach(function (l) { l.rotation.x = -1.2; }); horse.add(rider);
+      horse.userData.dyn = true; g.add(horse);
+      // the unknown hidden figure (only shown when the kid's version uses it)
+      var hidden = person({ coat: 0x3c3f44, pants: 0x34322e, hat: 'round', hatColor: 0x222222, musket: true });
+      hidden.userData.dyn = true; hidden.visible = false; g.add(hidden);
+      bakeAll(g);
+
+      // ---- non-baked overlays: zone markers, shooter ring, labels ----
+      var markers = {}, mk = new T.Group(); g.add(mk);
+      Object.keys(LINE.zones).forEach(function (zk) {
+        var Z = LINE.zones[zk], grp = new T.Group(), m;
+        var mm = new T.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.45, depthWrite: false, fog: false });
+        if (Z.kind === 'line') { m = new T.Mesh(new T.PlaneGeometry(Z.x1 - Z.x0 + 2, 1.4).rotateX(-Math.PI / 2), mm); m.position.set((Z.x0 + Z.x1) / 2, 0.12, Z.z); }
+        else { m = new T.Mesh(new T.RingGeometry(1.1, 1.7, 24).rotateX(-Math.PI / 2), mm); m.position.set(Z.x, 0.12, Z.z); }
+        grp.add(m); grp.userData.m = m; grp.visible = false; mk.add(grp); markers[zk] = grp;
+      });
+      var ring = new T.Mesh(new T.RingGeometry(0.55, 0.85, 24).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xff5a36, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
+      ring.visible = false; g.add(ring);
+      var fx = fxPool(g, 110);
+
+      var api = { scene: scene, group: g, militia: militia, regs: regs, horse: horse, rider: rider, hidden: hidden, markers: markers, ring: ring, fx: fx, hlegs: hlegs };
+
+      // ----- poses -----
+      function milRest(m) { m.position.copy(m.userData.base); m.rotation.set(0, m.userData.rotY, 0); standLegs(m); }
+      function regFormed(r) {
+        var u = r.userData;
+        if (u.adv) { r.position.set(u.slot.x, 0.05, u.slot.z); r.rotation.set(0, Math.PI, 0); }
+        else { r.position.set(1.2 + u.col * 1.3, 0.05, 21 + u.row * 1.6); r.rotation.set(0, Math.PI, 0); }
+        standLegs(r);
+      }
+      // cutscene pose as a pure function of time (seconds since the cutscene began)
+      api.poseCutscene = function (t) {
+        hidden.visible = false; ring.visible = false;
+        militia.forEach(milRest);
+        var h = head(t), marching = t < 14.2;
+        var wk = clamp01((t - 14) / 5.5);                   // wheel progress for the advance companies
+        regs.forEach(function (r) {
+          var u = r.userData, cx = 1.2 + u.col * 1.3, cz = Math.max(h, 21) + u.row * 1.6;
+          if (u.adv && wk > 0) {
+            var sx = cx, sz = 21 + u.row * 1.6, ex = u.slot.x, ez = u.slot.z, k = ease(wk);
+            var mx = sx, mz = ez + 3.5;                    // quadratic curve: come down the road, then swing out into line
+            var x = (1 - k) * (1 - k) * sx + 2 * (1 - k) * k * mx + k * k * ex, z = (1 - k) * (1 - k) * sz + 2 * (1 - k) * k * mz + k * k * ez;
+            var dx = 2 * (1 - k) * (mx - sx) + 2 * k * (ex - mx), dz = 2 * (1 - k) * (mz - sz) + 2 * k * (ez - mz);
+            r.position.set(x, 0.05, z);
+            r.rotation.set(0, wk < 1 ? Math.atan2(dx, dz) * (1 - k * k) + Math.PI * (k * k) : Math.PI, 0);
+            if (wk < 1) walkLegs(r, t, 7); else standLegs(r);
+          } else {
+            r.position.set(cx, 0.05, cz); r.rotation.set(0, Math.PI, 0);
+            if (marching) walkLegs(r, t, 7); else standLegs(r);
+          }
+        });
+        // the mounted officer leads the column, then rides out in front of the new line
+        var hk = ease(clamp01((t - 14.6) / 4.5));
+        horse.position.set(lerp(2.5, 2.2, hk), 0.05, lerp(Math.max(h, 21) - 3.2, 6.6, hk)); horse.rotation.set(0, 0, 0);
+        hlegs.forEach(function (l, j) { l.rotation.x = (marching || (hk > 0 && hk < 1)) ? Math.sin(t * 7 + j * 1.6) * 0.35 : 0; });
+      };
+      api.poseFormed = function () { hidden.visible = false; militia.forEach(milRest); regs.forEach(regFormed);
+        horse.position.set(2.2, 0.05, 6.6); horse.rotation.set(0, 0, 0); hlegs.forEach(function (l) { l.rotation.x = 0; }); };
+
+      // ----- the kid's version, replayed. Positions are a pure function of t; shots fire as t crosses event times -----
+      var REPLAY_T = 10.5, SHOT_T = 1.6;
+      function nearest(list, x, z) { var best = null, bd = 1e9; list.forEach(function (o) { var p = o.userData.base || o.position, d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z); if (d < bd) { bd = d; best = o; } }); return best; }
+      api.plan = function (v) {                       // resolve a version into concrete actors + events
+        var P = { v: v, events: [], shooter: null, kind: v.shooter }, pt = v.point || zonePoint(v.location, null);
+        api.poseFormed();
+        var frontRegs = regs.filter(function (r) { return r.userData.adv && r.userData.slot.front; });
+        var backRegs = regs.filter(function (r) { return r.userData.adv && !r.userData.slot.front; });
+        if (v.shooter === 'regular') { var s = nearest(frontRegs.map(function (r) { r.userData.base = new T.Vector3(r.userData.slot.x, 0, r.userData.slot.z); return r; }), pt.x, pt.z); P.shooter = s; P.from = new T.Vector3(s.userData.slot.x, 0.05, s.userData.slot.z); P.to = new T.Vector3(pt.x, 0.05, Math.min(pt.z, s.userData.slot.z) - (v.location === 'front' ? 0.8 : 0)); }
+        else if (v.shooter === 'officer') { P.shooter = horse; P.from = new T.Vector3(2.2, 0.05, 6.6); P.to = new T.Vector3(pt.x, 0.05, pt.z); }
+        else if (v.shooter === 'militiaman') { P.shooter = nearest(militia, pt.x, pt.z); }
+        else { P.shooter = hidden; P.spot = v.location; }
+        // events
+        var E = P.events;
+        E.push({ t: SHOT_T, kind: 'first' });
+        var a = v.aftermath;
+        function volley(t0, list, dirZ) { list.forEach(function (r, i) { E.push({ t: t0 + (i % 5) * 0.06 + (i * 0.013), kind: 'fire', who: r, dz: dirZ }); }); }
+        if (a === 'volley') { volley(2.8, frontRegs, -1); volley(3.5, backRegs, -1); }
+        if (a === 'fewshots') { E.push({ t: 2.5, kind: 'fire', who: militia[4], dz: 1 }); E.push({ t: 2.95, kind: 'fire', who: militia[12], dz: 1 }); volley(3.6, frontRegs, -1); volley(4.2, backRegs, -1); }
+        if (a === 'even') { [2.6, 5.0, 7.4].forEach(function (t0, j) { volley(t0, j % 2 ? backRegs : frontRegs, -1); }); [3.8, 6.2, 8.6].forEach(function (t0) { volley(t0, militia, 1); }); }
+        if (a === 'driveback') { volley(2.6, militia, 1); }
+        E.sort(function (x, y) { return x.t - y.t; });
+        P.dur = REPLAY_T; api.cur = P; return P;
+      };
+      function shooterMuzzle(P, out) {
+        var s = P.shooter; s.updateMatrixWorld(true);
+        if (P.kind === 'officer') { out.set(0.45, 2.75, -0.9).applyMatrix4(s.matrixWorld); return out; }
+        out.set(0.3, 1.5, 0.75).applyMatrix4(s.matrixWorld); return out;
+      }
+      var tmpV = new T.Vector3(), tmpD = new T.Vector3();
+      api.poseReplay = function (P, t, clockT) {
+        var v = P.v, a = v.aftermath;
+        militia.forEach(milRest);
+        regs.forEach(regFormed);
+        horse.position.set(2.2, 0.05, 6.6); horse.rotation.set(0, 0, 0); hlegs.forEach(function (l) { l.rotation.x = 0; });
+        hidden.visible = false;
+        // the first shooter gets into position
+        var k = ease(clamp01(t / 1.2));
+        if (P.kind === 'regular') { P.shooter.position.lerpVectors(P.from, P.to, k); if (k > 0 && k < 1) walkLegs(P.shooter, clockT, 7); }
+        if (P.kind === 'officer') { horse.position.lerpVectors(P.from, P.to, k); if (k > 0 && k < 1) hlegs.forEach(function (l, j) { l.rotation.x = Math.sin(clockT * 7 + j * 1.6) * 0.35; }); }
+        if (P.kind === 'militiaman') { P.shooter.rotation.y = 0; }
+        if (P.kind === 'hidden') {
+          hidden.visible = true; var Z = LINE.zones[P.spot];
+          hidden.position.set(Z.x, 0.05, Z.z); hidden.rotation.set(0, P.spot === 'wall' ? 1.21 : -1.23, 0); standLegs(hidden);
+          if (P.spot === 'wall') kneel(hidden, 0.75);
+        }
+        // aftermath motion
+        var ch = clamp01((t - (a === 'fewshots' ? 4.6 : 4.0)) / 4.5);
+        if ((a === 'volley' || a === 'fewshots') && ch > 0) {
+          regs.forEach(function (r) { if (!r.userData.adv) return; r.position.z -= ease(ch) * 7.5 + (r.userData.col - 1) * 0; walkLegs(r, clockT, 11, 0.6); });
+          // officers try to get in front of it — the charge is beyond their control
+          horse.position.x = lerp(horse.position.x, 9.5, ease(clamp01((t - 4.2) / 3))); horse.rotation.y = -ease(clamp01((t - 4.2) / 1.5)) * 1.2;
+          hlegs.forEach(function (l, j) { l.rotation.x = Math.sin(clockT * 9 + j * 1.6) * 0.4; });
+        }
+        if (a === 'volley' || a === 'fewshots') {
+          var s0 = a === 'volley' ? 3.0 : 4.1, sk = clamp01((t - s0) / 4.5);
+          militia.forEach(function (m, i) {
+            if (P.kind === 'militiaman' && m === P.shooter && t < s0) return;
+            if (i === 2 || i === 7 || i === 11 || i === 15) { kneel(m, ease(clamp01((t - s0 + 0.1) / 0.6))); return; }   // some go down on one knee
+            if (sk <= 0) return;
+            var ang = Math.atan2(m.userData.base.x * 0.18, -1) + (i % 3 - 1) * 0.35;
+            m.position.x += Math.sin(ang) * sk * 9; m.position.z += Math.cos(ang) * sk * 9; m.rotation.y = ang; walkLegs(m, clockT, 12, 0.7);
+          });
+        }
+        if (a === 'stopped') {                          // an officer rides along the front; nobody moves
+          var sk2 = clamp01((t - 2.2) / 3.2);
+          horse.position.x = 2.2 + Math.sin(sk2 * Math.PI) * -7; horse.rotation.y = (sk2 > 0 && sk2 < 1 ? (sk2 < 0.5 ? 1.4 : -1.4) : 0);
+          if (sk2 > 0 && sk2 < 1) hlegs.forEach(function (l, j) { l.rotation.x = Math.sin(clockT * 9 + j * 1.6) * 0.4; });
+        }
+        if (a === 'driveback') {
+          var dk = ease(clamp01((t - 3.2) / 4.5));
+          militia.forEach(function (m) { m.position.z += dk * 7; m.rotation.y = 0; if (dk > 0 && dk < 1) walkLegs(m, clockT, 11, 0.6); });
+          regs.forEach(function (r) { if (!r.userData.adv) return; r.position.z += dk * 9; r.rotation.y = dk > 0 ? 0 : Math.PI; if (dk > 0 && dk < 1) walkLegs(r, clockT, 11, 0.6); });
+          horse.position.z += dk * 10; horse.rotation.y = dk > 0 ? Math.PI : 0;
+        }
+        // the first shooter stays visible in place for the first shot
+        if (P.kind === 'militiaman' && t < SHOT_T + 0.8) { P.shooter.position.copy(P.shooter.userData.base); P.shooter.rotation.set(0, 0, 0); standLegs(P.shooter); }
+        ring.visible = t < SHOT_T + 2.2; if (ring.visible) { var sp = P.kind === 'officer' ? horse.position : P.shooter.position; ring.position.set(sp.x, 0.13, sp.z); var pul = 1 + 0.15 * Math.sin(clockT * 8); ring.scale.set(pul, pul, pul); }
+      };
+      api.fireEvents = function (P, t0, t1) {        // fire the events whose time lies in (t0, t1]
+        P.events.forEach(function (e) {
+          if (e.t <= t0 || e.t > t1) return;
+          if (e.kind === 'first') { shooterMuzzle(P, tmpV); tmpD.set(0, 0, P.kind === 'militiaman' ? 1 : P.kind === 'hidden' ? 0 : -1);
+            if (P.kind === 'hidden') { P.shooter.getWorldDirection(tmpD); }
+            fx.shot(tmpV, tmpD, true); }
+          else if (e.kind === 'fire') { var w = e.who; w.updateMatrixWorld(true); tmpV.set(0.3, 1.5, 0.75).applyMatrix4(w.matrixWorld); tmpD.set(0, 0, e.dz); fx.shot(tmpV, tmpD, false); }
+        });
+      };
+      api.shooterWorld = function (P, out) { if (!P || !P.shooter) return null; return shooterMuzzle(P, out); };
+      api.SHOT_T = SHOT_T; api.REPLAY_T = REPLAY_T;
+      return api;
+    }
+
+    // snap a picked ground point to the nearest allowed zone (returns {zone, x, z})
+    function zonePoint(zone, p) {
+      var Z = LINE.zones[zone]; if (!Z) return null;
+      if (Z.kind === 'spot') return { zone: zone, x: Z.x, z: Z.z };
+      var x = p ? Math.max(Z.x0, Math.min(Z.x1, p.x)) : (Z.x0 + Z.x1) / 2 + (zone === 'ranks' ? -0.6 : 0.2);
+      return { zone: zone, x: x, z: Z.z };
+    }
+    function snap(p, allowed) {
+      var best = null, bd = 1e9;
+      allowed.forEach(function (z) { var q = zonePoint(z, p), d = (q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z); if (d < bd) { bd = d; best = q; } });
+      return best;
+    }
+
+    // ======================= the globe (v2.1) =======================
+    function decodeCoast(b64) {
+      var bin = atob(b64), pos = 0;
+      function vi() { var n = 0, m = 1, b; do { b = bin.charCodeAt(pos++); n += (b & 127) * m; m *= 128; } while (b & 128); return (n & 1) ? -(n + 1) / 2 : n / 2; }
+      var nr = vi(), rings = [];
+      for (var r = 0; r < nr; r++) { var np = vi(), a = new Float32Array(np * 2), x = 0, y = 0;
+        for (var i = 0; i < np; i++) { x += vi(); y += vi(); a[i * 2] = x * 0.02; a[i * 2 + 1] = y * 0.02; } rings.push(a); }
+      return rings;
+    }
+    function ll2v(lat, lon, r, out) { var la = lat * D2R, lo = lon * D2R; return (out || new T.Vector3()).set(Math.cos(la) * Math.sin(lo) * r, Math.sin(la) * r, Math.cos(la) * Math.cos(lo) * r); }
+    var gScene = new T.Scene(), gCam = new T.PerspectiveCamera(50, 1, 0.005, 200);
+    gScene.background = new T.Color(0x040814);
+    var globe = new T.Group(); gScene.add(globe);
+    var globePaintMs = 0, earth;
+    function paintMap() {
+      var t0 = performance.now();
+      var W = Math.min(4096, renderer.capabilities.maxTextureSize || 4096), H = W / 2;
+      var cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H; var x = cvs.getContext('2d');
+      var rings = decodeCoast(window.WG_COAST_B64), path = new Path2D(), coastPath = new Path2D();
+      rings.forEach(function (a) {
+        var n = a.length / 2, u = new Float32Array(n), lo = 1e9, hi = -1e9;
+        for (var i = 0; i < n; i++) { var L = a[i * 2]; if (i) { var d = L - a[i * 2 - 2]; if (d > 180) d -= 360; else if (d < -180) d += 360; L = u[i - 1] + d; } u[i] = L; lo = Math.min(lo, L); hi = Math.max(hi, L); }
+        var polar = Math.abs(u[n - 1] - u[0]) > 180, offs = polar ? [0] : [-360, 0, 360];
+        offs.forEach(function (o) {
+          if (!polar && (hi + o < -180 || lo + o > 180)) return;
+          var pen = false;
+          for (var i = 0; i < n; i++) { var px = ((polar ? a[i * 2] : u[i] + o) + 180) / 360 * W, py = (90 - a[i * 2 + 1]) / 180 * H;
+            if (i) path.lineTo(px, py); else path.moveTo(px, py);
+            var edge = polar && a[i * 2 + 1] < -84.5;
+            if (edge) pen = false; else if (pen) coastPath.lineTo(px, py); else { coastPath.moveTo(px, py); pen = true; } }
+          path.closePath(); if (!polar) coastPath.closePath();
+        });
+      });
+      var oc = x.createLinearGradient(0, 0, 0, H);
+      oc.addColorStop(0, '#1b4677'); oc.addColorStop(0.5, '#1f5a98'); oc.addColorStop(1, '#1b4677');
+      x.fillStyle = oc; x.fillRect(0, 0, W, H);
+      var cell = W / 160, rs = 7, TW = Math.round(cell * 16), TH = Math.round(cell * 8);
+      function rnd2() { rs = (rs * 16807) % 2147483647; return rs / 2147483647; }
+      function facetTile(alpha) {
+        var tc = document.createElement('canvas'); tc.width = TW; tc.height = TH; var tx = tc.getContext('2d'), c = TW / 16;
+        for (var gy = 0; gy < 8; gy++) for (var gx = -1; gx <= 16; gx++) {
+          var x0 = gx * c + (gy & 1 ? c / 2 : 0), y0 = gy * c;
+          for (var t = 0; t < 2; t++) { var v = rnd2(); tx.fillStyle = v > 0.5 ? 'rgba(255,255,255,' + (alpha * (v - 0.5) * 2) + ')' : 'rgba(0,0,0,' + (alpha * (0.5 - v) * 2) + ')';
+            tx.beginPath(); if (t) { tx.moveTo(x0, y0); tx.lineTo(x0 + c, y0); tx.lineTo(x0 + c / 2, y0 + c); } else { tx.moveTo(x0 + c / 2, y0 + c); tx.lineTo(x0 + c, y0); tx.lineTo(x0 + c * 1.5, y0 + c); } tx.fill(); }
+        }
+        return tc;
+      }
+      function facets(alpha) { x.fillStyle = x.createPattern(facetTile(alpha), 'repeat'); x.fillRect(0, 0, W, H); }
+      facets(0.06);
+      x.lineJoin = 'round'; x.lineCap = 'round';
+      x.strokeStyle = 'rgba(64,138,200,.45)'; x.lineWidth = W / 220; x.stroke(coastPath);
+      x.strokeStyle = 'rgba(96,170,220,.55)'; x.lineWidth = W / 600; x.stroke(coastPath);
+      var stops = [[0, '#eef3f6'], [0.1, '#e6edf0'], [0.15, '#58784a'], [0.25, '#4e7a3e'], [0.31, '#62904a'],
+        [0.36, '#b9a26c'], [0.41, '#d2b87c'], [0.45, '#7c9a4e'], [0.5, '#3f7f35'], [0.56, '#4a8a3a'], [0.62, '#c4a970'], [0.68, '#8fa05a'], [0.75, '#5d7a46'], [0.81, '#e3eaee'], [1, '#f2f6f8']];
+      var lc = document.createElement('canvas'); lc.width = W; lc.height = H; var main = x; x = lc.getContext('2d');
+      var lg = x.createLinearGradient(0, 0, 0, H); stops.forEach(function (sp) { lg.addColorStop(sp[0], sp[1]); });
+      x.fillStyle = lg; x.fillRect(0, 0, W, H); facets(0.12);
+      x.globalCompositeOperation = 'destination-in'; x.fillStyle = '#000'; x.fill(path, 'evenodd');
+      x = main; x.drawImage(lc, 0, 0);
+      x.strokeStyle = 'rgba(28,46,30,.6)'; x.lineWidth = Math.max(1.2, W / 2800); x.stroke(coastPath);
+      var tex = new T.CanvasTexture(cvs); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      globePaintMs = Math.round(performance.now() - t0);
+      return tex;
+    }
+    function ensureEarthMap() { if (earth.material.map) return; earth.material.map = paintMap(); earth.material.color.set(0xffffff); earth.material.needsUpdate = true; }
+    (function buildGlobe() {
+      earth = new T.Mesh(new T.SphereGeometry(1, 128, 64), new T.MeshStandardMaterial({ color: 0x1f5a98, roughness: 0.92, metalness: 0, flatShading: true }));
+      earth.rotation.y = -Math.PI / 2; globe.add(earth);
+      var ac = document.createElement('canvas'); ac.width = ac.height = 256; var ax = ac.getContext('2d'), gr = ax.createRadialGradient(128, 128, 0, 128, 128, 128);
+      gr.addColorStop(0, 'rgba(110,170,255,0)'); gr.addColorStop(0.72, 'rgba(110,170,255,0)'); gr.addColorStop(0.78, 'rgba(130,190,255,.55)');
+      gr.addColorStop(0.86, 'rgba(90,150,255,.18)'); gr.addColorStop(1, 'rgba(60,110,255,0)'); ax.fillStyle = gr; ax.fillRect(0, 0, 256, 256);
+      var at = new T.CanvasTexture(ac); at.colorSpace = T.SRGBColorSpace;
+      var atm = new T.Sprite(new T.SpriteMaterial({ map: at, transparent: true, depthWrite: false, blending: T.AdditiveBlending }));
+      atm.scale.set(2.56, 2.56, 1); atm.renderOrder = -1; gScene.add(atm);
+      seed = 99;
+      var sp = new Float32Array(1600 * 3), v = new T.Vector3();
+      for (var i = 0; i < 1600; i++) { v.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).normalize().multiplyScalar(rnd(60, 90)); sp[i * 3] = v.x; sp[i * 3 + 1] = v.y; sp[i * 3 + 2] = v.z; }
+      var sg = new T.BufferGeometry(); sg.setAttribute('position', new T.BufferAttribute(sp, 3));
+      gScene.add(new T.Points(sg, new T.PointsMaterial({ color: 0xdfe8ff, size: 1.6, sizeAttenuation: false })));
+    })();
+    gScene.add(new T.HemisphereLight(0xcfe0ff, 0x1a2233, 0.9));
+    var gSun = new T.DirectionalLight(0xfff3e0, 2.4); gSun.position.set(-3, 2.5, 5); gScene.add(gSun);
+    var LEX = { lat: 42.45, lon: -71.23 };
+    var pin = new T.Group();
+    pin.add(new T.Mesh(new T.ConeGeometry(0.012, 0.05, 6).rotateX(-Math.PI / 2).translate(0, 0, 0.025), new T.MeshBasicMaterial({ color: 0xff9a52 })));
+    var pinDot = new T.Sprite(new T.SpriteMaterial({ map: GLOW, color: 0xffb070, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); pin.add(pinDot);
+    var pinLab = labelSprite('Lexington · AD 1775'); pinLab.position.set(0, 0, 0.1); pin.add(pinLab);
+    pin.position.copy(ll2v(LEX.lat, LEX.lon, 1.002)); pin.lookAt(ll2v(LEX.lat, LEX.lon, 2)); globe.add(pin);
+    var START = { lat: 18, lon: -5 };
+    // u: 0..1 — spin in from over the Atlantic and zoom down to Lexington's real latitude/longitude
+    function placeGlobe(u) {
+      var S = ease(u), dLon = (LEX.lon - START.lon) - 360;   // one extra westward turn
+      var lon = START.lon + dLon * S, lat = START.lat + (LEX.lat - START.lat) * S;
+      globe.rotation.set(lat * D2R, -lon * D2R, 0, 'XYZ');
+      var alt = 0.3 + 2.4 * (1 - ease(clamp01((u - 0.35) / 0.65)));
+      gCam.position.set(0, 0, 1 + alt); gCam.lookAt(0, 0, 0);
+      var ps = 0.2 + alt * 0.95, far = clamp01((alt - 0.5) / 0.8);
+      pin.children[0].scale.setScalar(ps); pinDot.scale.set(0.05 * ps, 0.05 * ps, 1);
+      pinLab.material.opacity = far; pinLab.scale.set(0.42 * ps * 0.55, 0.08 * ps * 0.55, 1); pinLab.position.z = 0.06 * ps;
+      globe.updateMatrixWorld(true); var wp = new T.Vector3(); pin.getWorldPosition(wp); pinLab.visible = wp.z > 0.25 && far > 0.01; pinDot.visible = wp.z > 0;
+    }
+
+    // ---------- cameras, picking ----------
+    var cam = new T.PerspectiveCamera(50, 1, 0.1, 600), camB = new T.PerspectiveCamera(50, 1, 0.1, 600);
+    var controls = new T.OrbitControls(cam, cv);
+    controls.enableDamping = true; controls.dampingFactor = 0.08; controls.minDistance = 6; controls.maxDistance = 70; controls.maxPolarAngle = Math.PI * 0.47;
+    controls.enabled = false;
+    var ray = new T.Raycaster(), ndc = new T.Vector2(), ground = new T.Plane(new T.Vector3(0, 1, 0), 0), hit = new T.Vector3();
+    function pickGround(clientX, clientY) {
+      var r = cv.getBoundingClientRect(); ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, cam); return ray.ray.intersectPlane(ground, hit) ? { x: hit.x, z: hit.z } : null;
+    }
+    function project(v3, camera, w, h, out) { var p = v3.clone().project(camera || cam); out = out || {}; out.x = (p.x + 1) / 2 * w; out.y = (1 - p.y) / 2 * h; out.vis = p.z < 1; return out; }
+
+    return {
+      renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls,
+      makeLex: makeLex, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
+      globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; } },
+      pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3
+    };
+  }
+  window.WGWorld = { create: create };
+})();

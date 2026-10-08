@@ -1,0 +1,71 @@
+/* Witness the First Shot — ESSAY CHECK RULES (local only: no AI, no network).
+   Question: "Which side do you believe fired first, and why?"
+
+   PASS = all three:
+     (a) evidence: at least `minRefs` DIFFERENT evidence references. A reference = one rule below whose pattern matches.
+         Rules that point at the same card count once per card ("group"). A reference to the kid's OWN reenactment
+         (see `own`) counts as one extra reference and is reported as a STRONG reference (bonus).
+     (b) other side: the essay mentions the account it does NOT side with (see `accounts`) AND uses a weighing word
+         (why it is weaker, or why it is still possible). If the stance can't be detected, both accounts must be mentioned.
+     (c) length: at least `minWords` words.
+   All patterns are case-insensitive JavaScript regex source strings, tested against the lowercased essay. */
+window.WG_ESSAY = {
+  question: 'Which side do you believe fired first, and why?',
+  minWords: 60,
+  minRefs: 2,
+
+  // (a) evidence references: distinctive details from each card
+  refs: [
+    { id: 'revere-house',   group: 'revere1775', label: "A house blocked Revere's view of the militia", any: ["\\bhouse\\b[^.]{0,60}\\b(block|cover|hid|in the way|view|see)", "(couldn'?t|could not|can'?t|didn'?t) see[^.]{0,30}militia", "covered from (me|him)"] },
+    { id: 'revere-smoke',   group: 'revere1775', label: 'Revere saw smoke in front of the Troops', any: ["smo+ke?[^.]{0,40}in front", "in front of the troops"] },
+    { id: 'revere-pistol',  group: 'revere1798', label: '"appeared to be a Pistol"', any: ["pistol"] },
+    { id: 'revere-later',   group: 'revere1798', label: "Revere's 1798 letter came later (same witness)", any: ["1798", "belknap", "(later|years later|23 years)[^.]{0,40}(letter|account|wrote|story)", "same witness"] },
+    { id: 'revere-roar',    group: 'revere1798', label: 'two Guns, then a Continual roar', any: ["\\broar\\b", "two guns", "musquetry"] },
+    { id: 'barker-shots',   group: 'barker',     label: "Barker's diary: the militia fired two shots first", any: ["\\bbarker\\b", "\\bdiary\\b", "two shots"] },
+    { id: 'depositions',    group: 'depositions', label: 'Militia depositions: the regulars fired first', any: ["depositions?", "sworn", "testimon(y|ies)"] },
+    { id: 'doolittle-art',  group: 'doolittle',  label: "Doolittle's engraving is an artist's picture", any: ["doolittle", "engraving", "\\bartist", "\\bpicture\\b", "\\bdrawing\\b"] },
+    { id: 'outcome',        group: 'outcome',    label: '8 colonists killed and 10 wounded vs 1 British soldier wounded', any: ["\\b8\\b[^.]{0,25}(killed|dead|died|colonist)", "\\beight\\b[^.]{0,25}(killed|dead|died|colonist)", "\\b(10|ten)\\b[^.]{0,15}wounded", "(only )?(1|one)[^.]{0,20}(british|redcoat|regular|soldier)[^.]{0,20}(wounded|hurt)"] },
+    { id: 'numbers',        group: 'numbers',    label: 'About 400 regulars vs about 80 militia', any: ["\\b400\\b", "four hundred", "\\b80\\b", "eighty", "outnumbered"] },
+    { id: 'formation',      group: 'formation',  label: 'The militia stood in plain sight, in parade formation', any: ["plain sight", "\\bparade\\b", "formation", "two ranks", "lined up"] },
+    { id: 'control',        group: 'control',    label: "The charge got beyond the officers' control", any: ["(out of|beyond)[^.]{0,25}control", "lost control", "(couldn'?t|could not) (stop|control)"] }
+  ],
+
+  // which account is which (for (b) and for hints)
+  accounts: {
+    militia: { label: "the militia's account", any: ["militia'?s? (account|side|story|version)", "depositions?", "militia (say|said|says|claim|claimed|swore)", "colonists (say|said|claim)", "(regulars?|british|redcoats?|soldiers?) (fired|shot) first"] },
+    british: { label: 'the British account', any: ["british (account|side|story|version)", "\\bbarker\\b", "\\bdiary\\b", "british (say|said|says|claim|claimed)", "(militia|colonists|minutemen|americans) (fired|shot) first"] }
+  },
+  stance: {   // what the kid believes; first match near an "I think / I believe" wins, else the first plain match
+    lead: "(i (think|believe|guess|say|bet)|probably|most likely|my answer|i'?m (pretty )?sure)",
+    british: "(british|regulars?|redcoats?|soldiers?|officer)[^.]{0,20}(fired|shot)[^.]{0,10}first",
+    militia: "(militia|colonists|minutemen|americans|provincials)[^.]{0,20}(fired|shot)[^.]{0,10}first",
+    unsure: "(can'?t tell|cannot tell|can'?t (be sure|know)|not sure|don'?t know|nobody knows|no one knows|impossible to (know|tell)|unsure)"
+  },
+  weighing: "\\b(weaker|less (reliable|likely|trustworthy|believable)|but|however|although|though|might|could|maybe|possibly|still possible|biased|blame[sd]?|on (his|their) (own )?side|can'?t be sure|not sure|unreliable|paraphrase|unverified|later|only an artist|artist)\\b",
+
+  // STRONG reference: the kid's own reenactment. Needs, IN THE SAME SENTENCE, a personal phrase AND a detail matching what they actually
+  // picked (shooter / location / aftermath) or a card name + the colour that card actually got for them.
+  own: {
+    personal: "\\b(i|my|me)\\b[^.]{0,50}\\b(had|made|make|picked|chose|choose|put|version|reenact\\w*|replay\\w*|game|played|tried|acted)",
+    shooter:  { regular: "\\b(regular|soldier|redcoat)s?\\b", officer: "(officer|pistol)", militiaman: "militia ?man", hidden: "(hidden|hiding|someone behind)" },
+    location: { front: "in front", between: "between", ranks: "(ranks|in line|the line)", wall: "\\bwall\\b", house: "\\bhouse\\b" },
+    aftermath:{ volley: "(charg|volley)", fewshots: "(fired back|few (militia|shots))", stopped: "(stopp?ed|stop it)", even: "(gunfight|even|traded)", driveback: "(drove|drive|retreat)" },
+    cards:    { revere1775: "(revere'?s? (deposition|1775)|smoke card|deposition card)", revere1798: "(1798|belknap|letter|pistol card)", barker: "(barker|diary)", depositions: "(militia depositions|depositions? card)", doolittle: "(doolittle|engraving)",
+                numbers: "(numbers? card|400)", formation: "(plain sight|formation)", outcome: "(outcome|killed)", control: "(control)" },
+    colors:   { red: "\\b(red|contradict\\w*|didn'?t fit|did not fit)\\b", green: "\\b(green|fit|fits|fitted|matched|agreed)\\b", grey: "\\b(grey|gray|silent)\\b" }
+  },
+
+  // telemetry thresholds (flags only; nothing is auto-disqualified in v1)
+  telemetry: { lowRatio: 0.6, minCharsForRatio: 80 },
+
+  hints: {
+    length: 'Write a bit more: aim for at least {min} words (you have {n}).',
+    refs0: 'Use the evidence! Mention at least 2 details from the cards, like the house that blocked Revere\u2019s view, the "Pistol", or 8 killed vs 1 wounded.',
+    refs1: 'Good start with {got}. Add one more piece of evidence from a different card.',
+    otherNotPlayed: 'You haven\u2019t addressed {other} yet \u2014 try playing it, then say why it is weaker or still possible.',
+    otherPlayed: 'You haven\u2019t addressed {other} yet. Say why it is weaker \u2014 or why it is still possible.',
+    weigh: 'You mention both sides. Now say WHY one is weaker or could still be true (try "but", "however", "might").',
+    stance: 'Tip: say clearly which side you think fired first (or that you can\u2019t tell).',
+    own: 'Bonus idea: tell what happened in YOUR reenactment, e.g. which card turned red when you picked the shooter.'
+  }
+};

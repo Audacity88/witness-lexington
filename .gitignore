@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+*.log
+.env
+.env.*
+!.env.example
+.workbench/
+share.json
+**/share.json
+*.key
+.chief_token*

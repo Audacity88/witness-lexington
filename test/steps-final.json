@@ -1,0 +1,131 @@
+[
+ {
+  "name": "cut-globe",
+  "js": "WitnessGame.seek('cutscene',{t:3,pause:true})",
+  "shot": "01-cut-globe"
+ },
+ {
+  "name": "cut-march",
+  "js": "WitnessGame.seek('cutscene',{t:11,pause:true})",
+  "shot": "02-cut-march"
+ },
+ {
+  "name": "cut-wheel",
+  "js": "WitnessGame.seek('cutscene',{t:17,pause:true})",
+  "shot": "03-cut-wheel"
+ },
+ {
+  "name": "cut-tension",
+  "js": "WitnessGame.seek('cutscene',{t:22,pause:true})"
+ },
+ {
+  "name": "cut-dark",
+  "js": "WitnessGame.seek('cutscene',{t:27.5,pause:true})",
+  "shot": "04-cut-dark",
+  "expect": "document.body.innerText.includes('No witness saw who fired first.')"
+ },
+ {
+  "name": "pick",
+  "js": "WitnessGame.seek('pick',{pause:true})",
+  "shot": "05-pick",
+  "expect": "WitnessGame.state().stage==='pick'"
+ },
+ {
+  "name": "setup",
+  "js": "WitnessGame.seek('setup',{side:'militia',step:2,version:{shooter:'regular',location:'front'},pause:true})",
+  "shot": "06-setup"
+ },
+ {
+  "name": "replay-m",
+  "js": "WitnessGame.seek('replay',{version:{side:'militia',shooter:'regular',location:'front',aftermath:'volley'},t:3.2,pause:true})",
+  "shot": "07-replay"
+ },
+ {
+  "name": "rejected",
+  "js": "WitnessGame.seek('evidence',{version:{side:'militia',shooter:'officer',location:'front',aftermath:'stopped'},pause:true})",
+  "shot": "08-evidence-rejected",
+  "expect": "(s=>s.accepted===false&&s.redFacts.includes('outcome')&&s.redFacts.includes('control'))(WitnessGame.state())",
+  "wait": 1000
+ },
+ {
+  "name": "accepted-red",
+  "js": "WitnessGame.seek('evidence',{version:{side:'militia',shooter:'regular',location:'front',aftermath:'volley'},pause:true})",
+  "shot": "09-evidence-accepted-try-other",
+  "expect": "(s=>s.accepted===true&&s.redTestimony.includes('barker')&&s.redTestimony.includes('revere1798')&&s.offerOtherSide&&document.body.innerText.includes('Now try the other side'))(WitnessGame.state())",
+  "wait": 1000
+ },
+ {
+  "name": "room-1side",
+  "js": "WitnessGame.seek('evidenceRoom',{pause:true})",
+  "shot": "10-evidence-room",
+  "expect": "WitnessGame.state().stage==='evidenceRoom'&&[...document.images].some(i=>i.complete&&i.naturalWidth>500)"
+ },
+ {
+  "name": "room-scroll",
+  "js": "1",
+  "scroll": "document.querySelector('.wg-panel').scrollTop=document.querySelector('.wg-panel').scrollHeight*0.45",
+  "shot": "11-evidence-room-docs"
+ },
+ {
+  "name": "essay-fail",
+  "js": "WitnessGame.seek('essay',{pause:true,text:'I think the British fired first because Revere saw the smoke in front of the Troops. That is not fair.'})",
+  "after": "WitnessGame.checkEssay()",
+  "shot": "12-essay-failing-hints",
+  "expect": "(r=>!r.passed&&r.hints.some(h=>h.includes('the British account yet'))&&!r.criteria.length.pass&&!r.criteria.evidence.pass)(WitnessGame.state().essay)"
+ },
+ {
+  "name": "essay-clear",
+  "js": "WitnessGame.setEssay('')"
+ },
+ {
+  "name": "paste-attempt",
+  "js": "(()=>{const ta=document.querySelector('.wg-ta');const dt=new DataTransfer();dt.setData('text/plain','pasted essay text');ta.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true}));return ta.value.length})()",
+  "expect": "(e=>e.flags.pasteAttempted&&e.telemetry.pasteAttempts===1&&e.text==='')(WitnessGame.state().essay)"
+ },
+ {
+  "name": "essay-type",
+  "type": {
+   "sel": ".wg-ta",
+   "text": "I believe the British regulars fired first. Paul Revere saw the smoke in front of the Troops, and the Doolittle engraving shows the British firing. In my reenactment I picked a regular in front of the militia, and the depositions card was green. The British account from Barker's diary says the militia fired two shots first, but it is only a paraphrase and unverified, so it is weaker. It is still possible though, because a house covered the militia from Revere."
+  },
+  "after": "WitnessGame.checkEssay()",
+  "shot": "13-essay-passing",
+  "expect": "(e=>e.passed&&e.own.length>0&&e.flags.lowKeystrokeRatio===false&&e.flags.aiSuspected===null&&e.telemetry.keystrokes>300)(WitnessGame.state().essay)"
+ },
+ {
+  "name": "pick-after",
+  "js": "WitnessGame.seek('pick',{pause:true})",
+  "expect": "document.body.innerText.includes('evidence room')"
+ },
+ {
+  "name": "replay-b",
+  "js": "WitnessGame.seek('replay',{version:{side:'british',shooter:'militiaman',location:'ranks',aftermath:'fewshots'},t:3.2,pause:true})",
+  "shot": "14-replay-british"
+ },
+ {
+  "name": "evidence-b",
+  "js": "WitnessGame.seek('evidence',{version:{side:'british',shooter:'militiaman',location:'ranks',aftermath:'fewshots'},pause:true})",
+  "shot": "15-evidence-british",
+  "expect": "(s=>s.accepted===true&&!s.offerOtherSide)(WitnessGame.state())",
+  "wait": 1000
+ },
+ {
+  "name": "hidden-wall",
+  "js": "WitnessGame.seek('replay',{version:{side:'british',shooter:'hidden',location:'wall',aftermath:'fewshots'},t:3.2,pause:true})"
+ },
+ {
+  "name": "room-both",
+  "js": "WitnessGame.seek('evidenceRoom',{pause:true})",
+  "expect": "!document.querySelector('[data-r=other]')"
+ },
+ {
+  "name": "essay-both",
+  "js": "WitnessGame.seek('essay',{pause:true})",
+  "after": "WitnessGame.checkEssay()",
+  "expect": "WitnessGame.state().essay.passed===true"
+ },
+ {
+  "name": "final-state",
+  "js": "WitnessGame.state()"
+ }
+]

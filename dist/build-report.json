@@ -1,0 +1,14 @@
+{
+ "threeNames": 39,
+ "threeMinBytes": 604971,
+ "imageDataUriBytes": 121823,
+ "appMinBytes": 171076,
+ "bundleBytes": 898069,
+ "bundleSha256": "41e8b40c657cafdbc315a151955c9c9a9e832dbf7a6331bfecedd9b014f94d24",
+ "gzFenceJsonBytes": 444960,
+ "gzPayloadB64Bytes": 444244,
+ "inlineFenceJsonBytes": 913623,
+ "inlineFits": true,
+ "rewriterMatches": 0,
+ "closeScriptInPayload": 0
+}
