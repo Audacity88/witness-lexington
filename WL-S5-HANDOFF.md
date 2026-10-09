@@ -3,13 +3,13 @@
 - `card: WL-S5`
 - `kind: design` for essay rules/instructions, source wording, opening subtitle, GAME_DESIGN and DQ-43 through DQ-46. Slice code also received Astra code review.
 - `branch: wl-s5-polish`
-- `round: 3`
-- `base / HEAD: f3108e0024dcbc4c32b2acba43407d600646f0da`
+- `round: 4`
+- `base / HEAD: 9a162bd2b8f30bd79b7c548541693af99ab93827`
 - `original WL-S4 base: 245a943ff287833b172618e12155aef110118b7f`
 - `checkout: /Users/dan/witness-lexington-codex-wt/wl-s5-polish`
 - `repository: Audacity88/witness-lexington`, private
 - `commit: none; wrapper owns commit and private wl-* push`
-- `bundle SHA-256: 4c6544f5f5992e5bae1eb22abf45b7f3dc2b2b4004f1d087e6f397757b3e6088`
+- `bundle SHA-256: fdb60421c9a16b88f37239eaca4aa1651f6fce958ebd273b9b576fb0b34442b0`
 
 ## Card results
 
@@ -98,3 +98,20 @@ Changed files: data/essay-rules.js, test/green-essay-logic.cjs, GAME_DESIGN.md, 
 Validation: 107 controller checks, 136 geometry checks, 13 dist/fixture checks and 21 JavaScript syntax checks, including the generated bundle, pass. The offline build succeeds; both specs and generated scoring match, and git diff --check passes. Both reported comparisons failed at the round-3 base with one reference and now pass with two, with no density penalty.
 
 Final Astra code re-review PASS and Astra content re-review PASS, kind: design, cover this uncommitted diff at the exact branch/base above and bundle SHA-256 `4c6544f5f5992e5bae1eb22abf45b7f3dc2b2b4004f1d087e6f397757b3e6088`. No remaining findings. Browser gameplay and screenshots remain unverified; the reviewer commands and ownership above remain current. No install, network access, service control, commit, push, or external mutation occurred.
+
+
+## Round-4 review repair
+
+- `kind: design` for ownership recognition and the GAME_DESIGN/DQ-45 clarification; code review also required.
+- `base / HEAD: 9a162bd2b8f30bd79b7c548541693af99ab93827`
+- `commit: none; leave changes uncommitted for the wrapper`
+
+The blocking finding is accepted and fixed. Revere's forward ownership matcher now checks attribution after the deposition noun as well as before it. A shared noun guard prevents matching a deposition attributed to Parker, Barker or Doolittle, including by/of/from and written/given/sworn-by forms. It also protects possessive deposition matches. Valid direct attribution to Revere remains eligible.
+
+Full-essay tests cover both reported Parker forms, Captain John Parker and written-by wording, with all cards inspected or only the intended two cards inspected. They pass with Revere 1798 and Parker credits, no Revere 1775 credit and no density penalty. Inspecting only Revere 1775 earns no credit for these comparisons. The positive deposition-by-Revere case and earlier comparison, limitation, filtering and salad tests remain passing.
+
+Changed files: data/essay-rules.js, test/green-essay-logic.cjs, GAME_DESIGN.md, DESIGN_QUESTIONS.md, this handoff, regenerated test/csp-gz.html and all five generated dist artifacts. Historical quotations, dialogue, source-card claims, scoring marks, Finish gates and DQ-38/39 remain unchanged.
+
+Validation: 108 controller checks, 136 geometry checks, 13 dist/fixture checks and 21 JavaScript syntax checks pass. Offline build succeeds; specs and generated scoring match, and git diff --check passes. Both reported attribution forms reproduce a failing density check at the round-4 base and pass after repair without spurious Revere 1775 credit.
+
+Final Astra code review PASS and Astra content review PASS, kind: design, cover the uncommitted diff at the exact branch/base above and bundle SHA-256 `fdb60421c9a16b88f37239eaca4aa1651f6fce958ebd273b9b576fb0b34442b0`. No remaining findings. Browser gameplay and screenshots remain unverified; the reviewer commands and ownership above remain current. No install, network access, service control, commit, push, or external mutation occurred.

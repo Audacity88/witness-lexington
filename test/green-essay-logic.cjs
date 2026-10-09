@@ -258,6 +258,18 @@ check('Ordinary Revere comparisons preserve explicit and possessive document own
  const otherAuthor="Revere saw smoke in front of the troops, but Parker said in his 1775 deposition that the regulars fired first.";
  const r=C.essay(otherAuthor,D.cards.map(c=>c.id),null);assert.equal(r.refs.length,2);assert(!r.refs.some(r=>r.card==='revere1798'));assert.equal(r.criteria.structure.denseSentences,0);
 });
+check('Following deposition attribution does not borrow Parker evidence for Revere',()=>{
+ for(const owner of ['by Parker','of Parker','by Captain John Parker','written by Parker']){
+   const comparison="Revere's 1798 letter describes a pistol in front of the troops, and the deposition "+owner+" says the regulars fired first.";
+   const essay=endings[0].replace('Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first.',comparison).replace('His diary','However, his diary');
+   for(const inspected of [D.cards.map(c=>c.id),['revere1798','depositions']]){
+     const r=C.essay(essay,inspected,null);assert(r.passed,comparison);assert.equal(r.refs.length,2);assert(r.refs.some(r=>r.card==='revere1798'));assert(r.refs.some(r=>r.card==='depositions'));assert(!r.refs.some(r=>r.card==='revere1775'));assert.equal(r.criteria.structure.denseSentences,0);
+   }
+   assert.equal(C.essay(essay,['revere1775'],null).refs.length,0);
+ }
+ const own="Revere's 1798 letter says he saw a pistol, and the deposition by Revere says a house blocked his view.";
+ const r=C.essay(own,['revere1775','revere1798'],null);assert.equal(r.refs.length,2);assert.equal(r.criteria.structure.denseSentences,0);
+});
 check('Doolittle source limitations preserve evidence and inspection filtering',()=>{
  const claims=['Doolittle was only an artist, not an eyewitness to the first shot.', 'Doolittle was an artist, so his picture cannot prove who fired first.', 'Only an artist, Doolittle was not an eyewitness to the first shot.', 'Doolittle was not an eyewitness to the first shot.'];
  for(const claim of claims){
