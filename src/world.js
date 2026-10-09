@@ -594,6 +594,34 @@
       return { scene: scene, horse: horse, legs: legs, rings: rings };
     }
 
+    // WL-S2 reuses the Green before the arrival. No replay or firing API is invoked.
+    function makeDawn(lex, stops) {
+      lex.poseCutscene(0);
+      lex.regs.forEach(function (r) { r.visible = false; }); lex.horse.visible = false;
+      var g = new T.Group(); lex.scene.add(g);
+      var rings = [];
+      stops.forEach(function (s) {
+        var ring = new T.Mesh(new T.RingGeometry(0.7, 1.05, 16).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffd18b }));
+        ring.position.set(s.x, 0.12, s.z); g.add(ring); rings.push(ring);
+        var label = labelSprite(s.name); label.position.set(s.x, 3.4, s.z); label.scale.set(5.8, 0.9, 1); g.add(label);
+        if (['parker', 'militia', 'town'].includes(s.id)) {
+          var p = person({ coat: s.id === 'parker' ? 0x4a667b : 0x977870, pants: 0x6c6558, hat: 'round', hatColor: 0x292e39 });
+          p.position.set(s.x, 0.05, s.z + 1.7); p.rotation.y = Math.PI; g.add(p);
+        }
+      });
+      var eli = person({ coat: 0xd9af55, pants: 0x45516a, hat: 'round', hatColor: 0x826547 });
+      eli.scale.setScalar(0.8); g.add(eli);
+      var edge = mesh(new T.BoxGeometry(26, 0.06, 0.18), mat(0xffd18b), false);
+      edge.position.set(0, 0.1, -16); g.add(edge);
+      g.visible = false;
+      return { scene: lex.scene, group: g, eli: eli, rings: rings,
+        pose: function (x, z, dx, dz, time) {
+          eli.position.set(x, 0.05, z);
+          if (dx || dz) { eli.rotation.y = Math.atan2(dx, dz); walkLegs(eli, time, 9); }
+          else standLegs(eli);
+        } };
+    }
+
     // ---------- cameras, picking ----------
     var cam = new T.PerspectiveCamera(50, 1, 0.1, 600), camB = new T.PerspectiveCamera(50, 1, 0.1, 600);
     var controls = new T.OrbitControls(cam, cv);
@@ -608,7 +636,7 @@
 
     return {
       renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls,
-      makeLex: makeLex, makeNight: makeNight, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
+      makeLex: makeLex, makeNight: makeNight, makeDawn: makeDawn, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
       globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; } },
       pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3
     };

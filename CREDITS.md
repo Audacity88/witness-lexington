@@ -47,6 +47,16 @@ WL-D1 corrects this register and defines replacement content; it does not alter 
 - Eli, the borrowed horse, Lantern and Orchard households, their residents, the alarm errands, and personal notebook observations are invented gameplay. The lane and building geometry are simplified reconstructions, not historical routes or exact architecture. "Parsonage · reconstruction", "Lantern · fictional", and "Orchard · fictional" identify those limits in the scene.
 - The completion reflection distinguishes receiving a warning from personally seeing regulars. It is a lesson about Eli's fictional observations, not new testimony about the first shot. The slice has no fact cards or MHS item labels, and does not load the unrepaired v1 evidence or essay UI. Their text repair remains with WL-S3 before reuse.
 
+### WL-S2 displayed script register
+
+`data/dawn-muster.js` supplies Slice B's caption, dialogue, listening text, notebook records, and command source label. `src/night-ride.js` supplies its message relay, controls, transition, and checkpoint text. This handoff is `kind: design` as well as a code handoff.
+
+- The dawn date and Lexington Green caption resolve to `[SETTING]` and `[FORMATION]`, using the passages already registered in [SOURCES.md](SOURCES.md#formation). The militia models remain a simplified reconstruction, without an exact headcount.
+- Parker's "Keep together. Listen for orders." is the approved WL-D1 dramatized line, identified on screen as invented words, not a quotation. His name, militia context, and the notebook's command label resolve to `[FORMATION]` and `[COMMAND]` and [the command passage](SOURCES.md#commands-and-named-person-movements).
+- The hearing context is a visibly labeled document paraphrase of `[COMMAND]`: the cited secondary account describes some men not hearing Parker's raspy command. The near text repeats the dramatized Parker line. The distant text deliberately omits words in a simulated hearing task, explicitly identified as neither a historical quotation nor a transcription of an actual listener's experience. This silent text experiment supplies no historical measurement of distance, volume, or intent.
+- The fictional militiaman and townsperson use the proposed WL-D1 lines. Their question buttons, Eli's message relay, notebook observations, stop locations, and spectator boundary are invented. All carry fictional or dramatized labels. The boundary is a game safety marker, not a documented historical line.
+- The near/far reflection concerns only Eli's simulated hearing. No named figure gives an invented first-shot account, and no shot or combat occurs in Slice B. The unrepaired v1 evidence and essay scripts remain unreachable; WL-S3 owns those repairs before reuse.
+
 - Lexington Green low-poly scene and globe transition adapted from `workbench-forge` Witness History v2.1 (`buildLexington` + geographic transition).
 - three.js r186 + OrbitControls, bundled locally (no CDN).
 - Coastline data: Natural Earth 1:50m land (public domain).

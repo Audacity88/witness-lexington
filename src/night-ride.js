@@ -1,34 +1,54 @@
-/* WL-S1: opening, rewind, and Eli's fictional alarm errand. No scoring changes. */
+/* WL-S1/S2: opening, alarm errand, and dawn muster. No scoring changes. */
 (function () {
   'use strict';
-  var D = window.WL_NIGHT, T = window.THREE, host = document.getElementById('witness-game');
+  var D = window.WL_NIGHT, B = window.WL_DAWN, host = document.getElementById('witness-game');
   var STORE = 'witness-lexington-s1-v1', keys = {}, target = null, yaw = 0, drag = null;
-  var paused = false, elapsed = 0, last = performance.now(), storageOK = true, modalReturn = null, replaying = false;
+  var paused = false, elapsed = 0, last = performance.now(), storageOK = true, modalReturn = null, replaying = false, replayPhase = 'complete', dawn = null;
   host.classList.add('wl');
   var W = window.WGWorld.create(host), lex = W.makeLex(), night = W.makeNight();
-  W.canvas.setAttribute('aria-label', 'Low-poly Lexington scene. Use the labeled travel buttons or WASD to ride.');
+  W.canvas.setAttribute('aria-label', 'Low-poly Lexington scene. Use labeled travel buttons or WASD to ride or walk.');
   var state = fresh(), saved = readSave();
 
-  function fresh() { return { phase: 'intro', accepted: false, asked: false, visited: [], returned: false, x: 0, z: 44 }; }
+  function freshDawn() { return { met: false, delivered: false, listened: [], questions: [], boundary: false, x: -11, z: -9 }; }
+  function fresh() { return { phase: 'intro', accepted: false, asked: false, visited: [], returned: false, x: 0, z: 44, dawn: freshDawn() }; }
+  function uniqueIDs(list, allowed) {
+    return Array.isArray(list) && list.length <= allowed.length && new Set(list).size === list.length &&
+      list.every(function (id) { return allowed.includes(id); });
+  }
+  function validDawn(d) {
+    return d && typeof d.met === 'boolean' && typeof d.delivered === 'boolean' && typeof d.boundary === 'boolean' &&
+      uniqueIDs(d.listened, ['near', 'far']) && uniqueIDs(d.questions, ['militia', 'town']) &&
+      Number.isFinite(d.x) && d.x >= -13 && d.x <= 13 && Number.isFinite(d.z) && d.z >= -16 && d.z <= -8 &&
+      (d.met || !d.delivered && !d.listened.length && !d.questions.length && !d.boundary) &&
+      (!d.boundary || d.delivered && d.listened.length === 2 && d.questions.length === 2);
+  }
+  function musterDone() { var d = state.dawn; return d.delivered && d.listened.length === 2 && d.questions.length === 2; }
+  function onFoot() { return state.phase === 'muster'; }
+  function playable() { return state.phase === 'ride' || onFoot(); }
   function valid(s) {
-    return s && ['rewind', 'ride', 'complete'].includes(s.phase) && typeof s.accepted === 'boolean' &&
+    return s && ['rewind', 'ride', 'complete', 'dawn', 'muster', 'muster-complete'].includes(s.phase) && typeof s.accepted === 'boolean' &&
       typeof s.asked === 'boolean' && typeof s.returned === 'boolean' && Array.isArray(s.visited) &&
       s.visited.length <= 2 && new Set(s.visited).size === s.visited.length &&
       s.visited.every(function (id) { return id === 'lantern' || id === 'orchard'; }) &&
       Number.isFinite(s.x) && Math.abs(s.x) <= 1.6 && Number.isFinite(s.z) && s.z >= 0 && s.z <= 46 &&
       (!s.visited.length || s.accepted) && (!s.returned || s.visited.length === 2) &&
-      (s.phase !== 'complete' || s.returned) && (s.phase !== 'rewind' || !s.accepted);
+      (!['complete', 'dawn', 'muster', 'muster-complete'].includes(s.phase) || s.returned) &&
+      (s.phase !== 'rewind' || !s.accepted) && validDawn(s.dawn) &&
+      (!['rewind', 'ride', 'complete', 'dawn'].includes(s.phase) || !s.dawn.met && !s.dawn.delivered && !s.dawn.listened.length && !s.dawn.questions.length && !s.dawn.boundary) &&
+      (s.phase !== 'muster-complete' || s.dawn.boundary);
   }
   function readSave() {
     try {
       var raw = localStorage.getItem(STORE), s;
       try { s = JSON.parse(raw); } catch (e) { return null; }
+      // Upgrade the WL-S1 checkpoint in place, keeping its alarm and notebook.
+      if (s && s.version === 1 && s.run && !s.run.dawn && ['rewind', 'ride', 'complete'].includes(s.run.phase)) s.run.dawn = freshDawn();
       return s && s.version === 1 && valid(s.run) ? s.run : null;
     }
     catch (e) { storageOK = false; return null; }
   }
   function save() {
-    if (!['rewind', 'ride', 'complete'].includes(state.phase)) return;
+    if (!['rewind', 'ride', 'complete', 'dawn', 'muster', 'muster-complete'].includes(state.phase)) return;
     try { localStorage.setItem(STORE, JSON.stringify({ version: 1, run: state })); saved = JSON.parse(JSON.stringify(state)); }
     catch (e) { storageOK = false; }
     notice.textContent = storageOK ? 'Progress saves on this device.' : 'Saving is unavailable. Refresh will lose this run.';
@@ -56,7 +76,7 @@
   dialog.addEventListener('close', function () {
     clearMovement();
     if (modalReturn && modalReturn.isConnected && !modalReturn.disabled && modalReturn.getClientRects().length) modalReturn.focus();
-    else if (state.phase === 'ride') interactButton.focus();
+    else if (playable()) interactButton.focus();
     modalReturn = null;
   });
   function clearMovement() { keys = {}; target = null; drag = null; }
@@ -80,8 +100,14 @@
     ids = ids.concat(state.visited); if (state.returned) ids.push('returned');
     if (!ids.length) paragraph(dialog, 'No alarm observations collected yet.');
     ids.forEach(function (id, i) { paragraph(dialog, (i + 1) + '. ' + D.records[id]); });
+    dialog.appendChild(el('h3', '', 'Dawn muster observations · fictional gameplay'));
+    var d = state.dawn, dawnIDs = [];
+    if (d.met) dawnIDs.push('parker'); if (d.delivered) dawnIDs.push('delivered');
+    dawnIDs = dawnIDs.concat(d.listened, d.questions); if (d.boundary) dawnIDs.push('boundary');
+    if (!dawnIDs.length) paragraph(dialog, 'No dawn observations collected yet.');
+    dawnIDs.forEach(function (id) { paragraph(dialog, B.records[id]); });
     dialog.appendChild(el('h3', '', 'Historical context and citations'));
-    D.sources.forEach(function (s) {
+    D.sources.concat([B.source]).forEach(function (s) {
       var a = el('article'); paragraph(a, s.id + ' ' + s.label); paragraph(a, s.note);
       var link = el('a', '', 'Passage and source reference'); link.href = 'SOURCES.md#' + s.anchor;
       link.target = '_blank'; link.rel = 'noopener'; a.appendChild(link); dialog.appendChild(a);
@@ -95,35 +121,35 @@
     overlay.hidden = false; overlay.classList.toggle('black', state.phase === 'blackout');
   }
   function go(phase) {
-    clearMovement(); paused = false; elapsed = 0; state.phase = phase;
+    clearMovement(); paused = false; elapsed = 0; state.phase = phase; feedback.textContent = '';
     if (dialog.open) dialog.close(); save(); render();
   }
   function rewind() { go('rewind'); }
   function render() {
-    chapter.textContent = state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
-    panel.hidden = state.phase !== 'ride'; overlay.hidden = true;
-    top.inert = paused || state.phase !== 'ride' && state.phase !== 'opening';
-    panel.inert = paused || state.phase !== 'ride' && state.phase !== 'opening';
-    pauseButton.disabled = ['intro', 'blackout', 'rewind', 'complete'].includes(state.phase);
+    chapter.textContent = ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
+    panel.hidden = !playable(); overlay.hidden = true;
+    top.inert = paused || !playable() && state.phase !== 'opening';
+    panel.inert = paused || !playable() && state.phase !== 'opening';
+    pauseButton.disabled = !playable() && state.phase !== 'opening';
     pauseButton.textContent = paused ? 'Resume' : 'Pause';
     top.hidden = state.phase === 'blackout';
     if (paused) {
-      showCard('Paused', 'The scene and your horse are stopped.');
+      showCard('Paused', 'The scene and your movement are stopped.');
       card.appendChild(button('Resume', function () { setPaused(false); }, 'resume', true)); return;
     }
     if (state.phase === 'intro') {
-      showCard('Witness Lexington', 'A warning in the night. A question at dawn. Play Eli, a fictional 12-year-old Lexington resident.', 'Slice A · The night alarm');
+      showCard('Witness Lexington', 'A warning in the night. A question at dawn. Play Eli, a fictional 12-year-old Lexington resident.', 'Slices A and B · Night alarm and dawn muster');
       paragraph(card, 'Your errands are dramatized. Historical context has source labels in your notebook. No combat or timer.');
       var start = button('Begin the opening', function () { go('opening'); }, 'begin', true); card.appendChild(start);
-      if (saved) card.appendChild(button('Resume saved alarm', function () { state = JSON.parse(JSON.stringify(saved)); go(state.phase); }, 'load'));
+      if (saved) card.appendChild(button('Resume saved run', function () { state = JSON.parse(JSON.stringify(saved)); go(state.phase); }, 'load'));
     } else if (state.phase === 'opening') {
       panel.hidden = false; route.replaceChildren(); actionRow.hidden = true; notice.hidden = true;
       route.appendChild(button('Skip to rewind', function () { go('blackout'); }, 'skip'));
       caption();
     } else if (state.phase === 'blackout') {
       showCard(D.pivot.text, 'The camera cut away before any shot. This opening cannot identify a first shooter.', D.pivot.source);
-      card.appendChild(button(replaying ? 'Return to the alarm checkpoint' : 'Rewind to the night', function () {
-        if (replaying) { replaying = false; go('complete'); } else rewind();
+      card.appendChild(button(replaying ? 'Return to the saved checkpoint' : 'Rewind to the night', function () {
+        if (replaying) { replaying = false; go(replayPhase); } else rewind();
       }, 'rewind', true));
       card.appendChild(button('Read captions and sources', notebook, 'black-notebook'));
     } else if (state.phase === 'rewind') {
@@ -141,15 +167,39 @@
     } else if (state.phase === 'complete') {
       showCard('Alarm complete', 'Both households have heard the warning, and Eli is back at the meeting point.', 'WL-S1 checkpoint');
       paragraph(card, 'You heard reports. You did not see the regulars on the road. A warning can help people prepare without proving who will fire first.');
-      paragraph(card, 'Dawn muster is the next slice. It is not playable in this build.');
+      paragraph(card, 'Continue on foot to the dawn muster. Your alarm notes stay in the notebook.');
+      card.appendChild(button('Continue to dawn muster', function () { go('dawn'); }, 'continue-dawn', true));
       paragraph(card, storageOK ? 'Checkpoint saved on this device. You can return to your notebook after a refresh.' : 'Saving is unavailable. Keep this page open to retain your notebook.');
       card.appendChild(button('Read the notebook', notebook, 'end-notebook', true));
-      card.appendChild(button('Replay the opening', function () { replaying = true; go('opening'); }, 'replay'));
+      card.appendChild(button('Replay the opening', function () { replayPhase = state.phase; replaying = true; go('opening'); }, 'replay'));
+      card.appendChild(button('Restart this run', restart, 'restart'));
+    } else if (state.phase === 'dawn') {
+      showCard('Dawn muster', B.caption, 'WL-S2 · Simplified reconstruction');
+      paragraph(card, 'Eli leaves the borrowed horse and continues on foot. Meet Parker, carry an invented message, and compare two listening spots in either order.');
+      paragraph(card, 'Learn what distance can hide. Missing words cannot tell you anyone\'s intent or who will fire first. Speech and the hearing experiment are dramatized, not historical quotations.');
+      paragraph(card, 'WASD or arrows walk; drag to look; E interacts. Travel buttons assist movement. N opens the notebook; Escape pauses. There is no timer or combat.');
+      card.appendChild(button('Walk to the muster', function () { yaw = 0; go('muster'); }, 'start-muster', true));
+    } else if (onFoot()) {
+      actionRow.hidden = false; notice.hidden = false; route.replaceChildren();
+      B.stops.forEach(function (s) {
+        var b = button('Walk to ' + s.name, function () {
+          target = { x: s.x, z: s.z }; feedback.textContent = 'Walking to ' + s.name + '. Movement keys cancel assistance.';
+        }, 'travel-' + s.id);
+        b.disabled = !state.dawn.met && s.id !== 'parker'; route.appendChild(b);
+      });
+      updateObjective(); updateInteraction();
+    } else if (state.phase === 'muster-complete') {
+      showCard('Muster complete', 'Eli delivered the message, compared both listening spots, and found the spectator boundary.', 'WL-S2 checkpoint · Fictional gameplay');
+      paragraph(card, 'You heard a complete simulated instruction nearby and missing words farther away. A partial order does not establish intent or a first shooter.');
+      paragraph(card, 'The Green, historical evidence room, and essay arrive in WL-S3. They are not playable in this build.');
+      paragraph(card, storageOK ? 'Checkpoint saved on this device.' : 'Saving is unavailable. Keep this page open to retain your notebook.');
+      card.appendChild(button('Read the notebook', notebook, 'end-notebook', true));
+      card.appendChild(button('Replay the opening', function () { replayPhase = state.phase; replaying = true; go('opening'); }, 'replay'));
       card.appendChild(button('Restart this run', restart, 'restart'));
     }
   }
   function restart() {
-    openDialog('Restart this run?'); paragraph(dialog, 'This clears the saved alarm and Eli\'s gameplay observations.');
+    openDialog('Restart this run?'); paragraph(dialog, 'This clears the saved run and Eli\'s gameplay observations.');
     dialog.appendChild(button('Clear and restart', function () {
       try { localStorage.removeItem(STORE); } catch (e) { storageOK = false; }
       saved = null; state = fresh(); replaying = false; dialog.close(); go('intro');
@@ -159,22 +209,35 @@
     var i = Math.min(2, Math.floor(elapsed / 7)); objective.textContent = D.captions[i].text + ' ' + D.captions[i].source;
   }
   function updateObjective() {
+    if (onFoot()) {
+      var d = state.dawn;
+      objective.textContent = !d.met ? 'Meet Parker at the marked stop. Speech is dramatized. [FORMATION] [COMMAND]' :
+        musterDone() ? 'Find the spectator boundary and record the limits of what you heard.' :
+        'Deliver the message ' + (d.delivered ? '(done)' : '(pending)') + '; compare listening spots ' + d.listened.length + '/2; ask both fictional witnesses ' + d.questions.length + '/2. [COMMAND]';
+      return;
+    }
     objective.textContent = !state.accepted ? 'Meet Revere at the parsonage. This encounter is dramatized. [NIGHT]' :
       state.visited.length < 2 ? 'Carry the warning to both fictional households. Alarmed ' + state.visited.length + ' of 2. Choose either order.' :
       'Both households are alarmed. Return to the parsonage meeting point.';
   }
   function nearby() {
+    if (onFoot()) return B.stops.find(function (s) { return Math.hypot(state.dawn.x - s.x, state.dawn.z - s.z) < 1.6; });
     return D.stops.find(function (s) { return Math.hypot(state.x, state.z - s.z) < 3.5; });
   }
   function updateInteraction() {
     var s = nearby(), text = 'Approach a marked stop · E';
+    if (onFoot()) {
+      interactButton.textContent = s ? (s.id === 'near' || s.id === 'far' ? 'Listen at ' : s.id === 'boundary' ? 'Inspect ' : 'Talk with ') + s.name + ' · E' : 'Approach a marked stop · E';
+      interactButton.disabled = !s || !state.dawn.met && s.id !== 'parker'; return;
+    }
     if (s) text = s.id === 'parsonage' ? (state.visited.length === 2 ? 'Finish the alarm · E' : 'Talk with Revere · E') :
       (state.visited.includes(s.id) ? 'Revisit ' : 'Alert ') + s.name + ' · E';
     if (interactButton.textContent !== text) interactButton.textContent = text;
     interactButton.disabled = !s || (!state.accepted && s.id !== 'parsonage');
   }
   function interact() {
-    if (state.phase !== 'ride' || paused || dialog.open) return;
+    if (!playable() || paused || dialog.open) return;
+    if (onFoot()) { interactDawn(); return; }
     var s = nearby(); if (!s || (!state.accepted && s.id !== 'parsonage')) return;
     if (s.id === 'parsonage' && state.visited.length === 2) { state.returned = true; go('complete'); return; }
     openDialog(s.id === 'parsonage' ? 'Paul Revere' : s.name);
@@ -198,8 +261,47 @@
     }
     closeControl();
   }
+  function interactDawn() {
+    var s = nearby(), d = state.dawn;
+    if (!s || !d.met && s.id !== 'parker') return;
+    openDialog(s.name);
+    if (s.id === 'parker') {
+      sourceNote(dialog, 'Dramatized dialogue. Invented words, not a quotation.', '[FORMATION] [COMMAND]');
+      paragraph(dialog, B.parker);
+      paragraph(dialog, 'Fictional errand: carry a reminder to the marked militiaman to listen for orders. Eli does not cause any historical order or outcome.');
+      dialog.appendChild(button(d.met ? 'Continue the muster' : 'Accept the message', function () { d.met = true; dialog.close(); render(); save(); }, 'accept-message', true));
+    } else if (s.id === 'near' || s.id === 'far') {
+      sourceNote(dialog, 'Dramatized hearing experiment. Displayed text represents hearing; this scene is silent.', '[COMMAND]');
+      paragraph(dialog, B.hearing[s.id]);
+      paragraph(dialog, s.id === 'near' ? 'Nearby, the whole simulated instruction is clear.' : 'Farther away, some words are unclear. The gaps are simulated, not a trimmed primary-source quotation.');
+      paragraph(dialog, 'Historical context, paraphrase: the cited account describes some men not hearing Parker\'s raspy command. This invented experiment cannot reconstruct what any real individual heard. [COMMAND]');
+      dialog.appendChild(button(d.listened.includes(s.id) ? 'Already recorded · continue' : 'Record this listening spot', function () {
+        if (!d.listened.includes(s.id)) d.listened.push(s.id); dialog.close(); render(); save();
+      }, 'record-listening', true));
+    } else if (s.id === 'militia' || s.id === 'town') {
+      sourceNote(dialog, 'Fictional character · Dramatized dialogue. Not historical testimony.', '');
+      if (s.id === 'militia') {
+        paragraph(dialog, d.delivered ? 'You have already delivered the invented message.' : 'Pass on the reminder to listen for orders. This message relay is invented.');
+        var deliver = button(d.delivered ? 'Message already delivered' : 'Deliver the message', function () { d.delivered = true; save(); updateObjective(); deliver.disabled = true; deliver.textContent = 'Message already delivered'; }, 'deliver-message', true);
+        deliver.disabled = d.delivered; dialog.appendChild(deliver);
+      }
+      var answer = el('p');
+      dialog.appendChild(button(s.id === 'militia' ? 'What could you hear?' : 'What could you see?', function () {
+        answer.textContent = (s.id === 'militia' ? B.militiaman : B.townsperson) + ' · Dramatized dialogue';
+        if (!d.questions.includes(s.id)) d.questions.push(s.id); save(); updateObjective();
+      }, 'ask-' + s.id)); dialog.appendChild(answer);
+    } else {
+      sourceNote(dialog, 'Fictional gameplay boundary. The marked location is not a historical fact.', '');
+      paragraph(dialog, 'Stay at the spectator edge. Eli has no weapon and will not join the ranks.');
+      if (musterDone()) {
+        paragraph(dialog, 'Compare your notebook: hearing a report or part of an instruction does not establish who fired first.');
+        dialog.appendChild(button('Record the boundary and finish the muster', function () { d.boundary = true; go('muster-complete'); }, 'finish-muster', true));
+      } else paragraph(dialog, 'First deliver the message, record both listening spots, and ask both fictional witnesses. You can still visit every stop in any order.');
+    }
+    closeControl();
+  }
   function setPaused(value) {
-    if (!['opening', 'ride'].includes(state.phase) || dialog.open) return;
+    if (!playable() && state.phase !== 'opening' || dialog.open) return;
     paused = value; clearMovement(); render(); save();
     if (paused) card.querySelector('button').focus(); else pauseButton.focus();
   }
@@ -216,7 +318,7 @@
     }
     if (k === 'escape') { e.preventDefault(); setPaused(!paused); return; }
     if (k === 'n' && !e.repeat) { e.preventDefault(); notebook(); return; }
-    if (paused || state.phase !== 'ride') return;
+    if (paused || !playable()) return;
     if (movingKey(k)) { e.preventDefault(); keys[k] = true; target = null; }
     if (k === 'e' && !e.repeat) { e.preventDefault(); interact(); }
   });
@@ -225,7 +327,7 @@
   window.addEventListener('pagehide', save);
   document.addEventListener('visibilitychange', function () { if (document.hidden) { clearMovement(); setPaused(true); } });
   W.canvas.addEventListener('pointerdown', function (e) {
-    if (state.phase === 'ride' && !paused && !dialog.open) { drag = e.clientX; W.canvas.setPointerCapture(e.pointerId); }
+    if (playable() && !paused && !dialog.open) { drag = e.clientX; W.canvas.setPointerCapture(e.pointerId); }
   });
   W.canvas.addEventListener('pointermove', function (e) {
     if (drag !== null) { yaw += (drag - e.clientX) * 0.006; drag = e.clientX; }
@@ -245,8 +347,34 @@
     }
     if (opening) {
       // No firing events or replay plan is ever invoked. Hide the seed's leading officer.
+      if (dawn) dawn.group.visible = false;
+      lex.regs.forEach(function (r) { r.visible = true; });
       lex.poseCutscene(state.phase === 'intro' ? 15 : Math.min(19.5, 7 + elapsed * 0.65)); lex.horse.visible = false;
       W.cam.position.set(27, 19, 34); W.cam.lookAt(0, 1, 4); W.renderer.render(lex.scene, W.cam);
+    } else if (['dawn', 'muster', 'muster-complete'].includes(state.phase)) {
+      if (!dawn) dawn = W.makeDawn(lex, B.stops);
+      dawn.group.visible = true; lex.regs.forEach(function (r) { r.visible = false; }); lex.horse.visible = false;
+      var d = state.dawn, mx = 0, mz = 0;
+      if (onFoot() && d.met && !paused && !dialog.open) {
+        if (target) {
+          mx = target.x - d.x; mz = target.z - d.z;
+          if (Math.hypot(mx, mz) < 0.12) { d.x = target.x; d.z = target.z; target = null; mx = mz = 0; feedback.textContent = 'Arrived. Use the interaction button or E.'; save(); }
+        } else {
+          var f = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0);
+          var r = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
+          mx = -Math.sin(yaw) * f + Math.cos(yaw) * r; mz = -Math.cos(yaw) * f - Math.sin(yaw) * r;
+        }
+        var len = Math.hypot(mx, mz), step = target ? Math.min(dt * 4, len) : dt * 4;
+        if (len) { d.x = Math.max(-13, Math.min(13, d.x + mx / len * step)); d.z = Math.max(-16, Math.min(-8, d.z + mz / len * step)); }
+      }
+      dawn.pose(d.x, d.z, mx, mz, now / 1000);
+      dawn.rings.forEach(function (ring, i) {
+        var id = B.stops[i].id, done = id === 'parker' ? d.met : id === 'militia' ? d.delivered && d.questions.includes(id) : id === 'boundary' ? d.boundary : d.listened.includes(id) || d.questions.includes(id);
+        ring.material.color.set(done ? 0x83c4b2 : 0xffd18b);
+      });
+      W.cam.position.set(d.x + Math.sin(yaw) * 12, 10, d.z + Math.cos(yaw) * 12);
+      W.cam.lookAt(d.x, 1, d.z + 3); W.renderer.render(dawn.scene, W.cam);
+      if (onFoot()) updateInteraction();
     } else {
       var dx = 0, dz = 0;
       if (state.phase === 'ride' && state.accepted && !paused && !dialog.open) {
