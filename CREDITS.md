@@ -60,3 +60,14 @@ WL-D1 corrects this register and defines replacement content; it does not alter 
 - Lexington Green low-poly scene and globe transition adapted from `workbench-forge` Witness History v2.1 (`buildLexington` + geographic transition).
 - three.js r186 + OrbitControls, bundled locally (no CDN).
 - Coastline data: Natural Earth 1:50m land (public domain).
+
+### WL-S3 displayed script register
+
+This is a `kind: design` content handoff as well as a code handoff. `data/green.js` supplies the Green captions and fictional observations. `src/green-essay.js` supplies the modern study, hypothesis, and essay instructions. `data/evidence.js` supplies every card's source ID, source label, passage anchor, and limitation.
+
+- The advance-company turn and Pitcairn arrival caption resolve to `[COMMAND]`. Their animation timing, Eli's two spectator stops, staged obstruction, and shelter are visibly reconstructed or fictional. No named person receives new dialogue. The report and subsequent firing are silent text simulations. No shooter plan or first-shot effect runs.
+- Pivot uncertainty and completion captions resolve to `[PIVOT]`. The retreat and neutral shelter casualty statement resolve to `[OUTCOME]` and `[CONTROL]`. The camera conceals the origin at both spectator spots. Fictional scene notes cannot count as primary testimony.
+- The nine historical cards and all source labels resolve to their existing rows in this register. Revere 1775 uses a marked MHS trim and a separate labeled paraphrase for smoke and the obstructed view. Revere 1798 uses the marked MASSAR excerpt with `&` and its struck-through paragraph flag; MHS item 99 labels manuscript provenance only.
+- Barker's summaries and essay-reference label say **one or two shots**. NPS's published diary excerpt is the chosen source. Parker's card identifies his April 25 deposition, document No. 4, NARA 595246, and uses a summary. Every Doolittle scoring explanation describes how an artist pictured the British firing. The displayed Yale title, accession, image, and CC0 label use the inherited citation above.
+- The numbers card displays the estimate and scope note before scoring. Scoring marks, allowed locations, combination rule, and essay thresholds are inherited. Ranking is an unscored source-reflection task. A pattern-check pass does not settle the first shot or certify authorship.
+- WL-S3 made no network requests to recheck historical sources. Quotations and metadata use the checked source packet already in this checkout. Original document scans are honestly labeled unavailable; the Doolittle local image is present.

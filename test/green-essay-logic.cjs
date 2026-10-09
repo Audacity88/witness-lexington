@@ -1,0 +1,90 @@
+/* Integration checks with DOM/renderer stubs; no browser or visual acceptance. */
+const vm = require('node:vm'), fs = require('node:fs'), assert = require('node:assert/strict');
+const ROOT = require('node:path').resolve(__dirname, '..') + '/';
+class Element {
+ constructor(tag, doc) { this.tagName=tag.toUpperCase(); this.doc=doc; this.children=[]; this.events={}; this._text=''; this.hidden=false; this.disabled=false; this.open=false; this.clientWidth=960; this.clientHeight=540; this.classList={add(){},toggle(){}}; }
+ set textContent(t){ this._text=t; this.children=[]; } get textContent(){return this._text+this.children.map(x=>x.textContent).join('');}
+ append(...nodes){nodes.forEach(n=>{n.parent=this;this.children.push(n)});} appendChild(n){this.append(n);return n;}
+ replaceChildren(...nodes){this._text='';this.children=[];this.append(...nodes);}
+ setAttribute(k,v){this[k]=v;} addEventListener(k,fn){(this.events[k]??=[]).push(fn);} dispatch(k,e={}){for(const fn of this.events[k]||[]) fn(e);}
+ focus(){const old=this.doc.activeElement;if(old!==this){old?.dispatch('blur');this.doc.activeElement=this;this.dispatch('focus');}} get isConnected(){return true;} getClientRects(){return this.hidden?[]:[{}];} setPointerCapture(){}
+ contains(n){return n===this||this.children.some(c=>c.contains(n));}
+ querySelectorAll(tag){if(tag.includes(','))return this.children.flatMap(c=>[...(tag.split(', ').some(q=>q==='a[href]'?c.tagName==='A'&&c.href:c.tagName===q.toUpperCase())?[c]:[]),...c.querySelectorAll(tag)]);const matches=n=>tag[0]==='#'?n.id===tag.slice(1):tag[0]==='.'?n.className===tag.slice(1):n.tagName===tag.toUpperCase();return this.children.flatMap(c=>[...(matches(c)?[c]:[]),...c.querySelectorAll(tag)]);}
+ querySelector(tag){return this.querySelectorAll(tag)[0]||null;}
+ showModal(){this.open=true;} close(){this.open=false;this.dispatch('close');}
+}
+function boot(storage={}){
+ const doc={activeElement:null,events:{},addEventListener(k,fn){(this.events[k]??=[]).push(fn)},createElement(tag){return new Element(tag,doc)}};
+ const host=new Element('div',doc);doc.activeElement=host;doc.getElementById=id=>id==='witness-game'?host:walk(host).find(n=>n.id===id);
+ const events={}, canvas=new Element('canvas',doc);host.append(canvas);let callback,now=0,cutPoses=0;
+ const night={scene:{},horse:{position:{set(){}},rotation:{}},legs:Array.from({length:4},()=>({rotation:{}})),rings:Array.from({length:3},()=>({material:{color:{set(){}}}}))};
+ const ctx={document:doc,console,performance:{now:()=>now},localStorage:{getItem:k=>storage[k]||null,setItem:(k,v)=>storage[k]=v,removeItem:k=>delete storage[k]},
+ requestAnimationFrame:fn=>callback=fn,ResizeObserver:class{observe(){}},THREE:{},addEventListener:(k,fn)=>(events[k]??=[]).push(fn),WGWorld:{create:()=>({canvas,cam:{position:{set(){}},lookAt(){},updateProjectionMatrix(){}},renderer:{setSize(){},render(){}},makeNight:()=>night,makeLex:()=>({scene:{},regs:[],horse:{},poseCutscene(){cutPoses++}}),makeDawn:()=>({scene:{},group:{},rings:[],pose(){}}),makeGreen:()=>({group:{},pose(){}})})}};
+ ctx.window=ctx;vm.createContext(ctx);for(const file of ['data/night-ride.js','data/dawn-muster.js','data/evidence.js','data/essay-rules.js','data/green.js','src/evidence-check.js','src/green-essay.js','src/night-ride.js'])vm.runInContext(fs.readFileSync(ROOT+file,'utf8'),ctx,{filename:file});
+ function frame(ms=50){now+=ms;const cb=callback;callback=null;cb(now);}
+ function frames(n,ms=50){for(let i=0;i<n;i++)frame(ms);}
+ function click(id){const n=doc.getElementById(id);assert(n,'exists '+id);assert(!n.disabled,'enabled '+id);n.focus();n.dispatch('click');}
+ function key(k,extra={}){for(const fn of events.keydown||[])fn({key:k,target:doc.activeElement,preventDefault(){},...extra});}
+ function release(k){for(const fn of events.keyup||[])fn({key:k});}
+ function snap(){return ctx.WitnessGame.snapshot();}
+ function travel(id,z){click('travel-'+id);let n=0;while(snap().assisted&&n++<800)frame(1000/21);assert(n<800,'assisted arrival');assert(Math.abs(snap().run.z-z)<0.01);click('interact');}
+ function walkTo(id) { const s=ctx.WL_DAWN.stops.find(s=>s.id===id);click('travel-'+id);let n=0;while(snap().assisted&&n++<800)frame(1000/21);assert(n<800);assert(Math.hypot(snap().run.dawn.x-s.x,snap().run.dawn.z-s.z)<0.01);click('interact'); }
+ return {events,storage,doc,host,click,key,release,snap,frames,frame,travel,walkTo,ctx};
+}
+function walk(n){return [n,...n.children.flatMap(walk)];}
+const checks=[];function check(name,fn){fn();checks.push(name);}
+const KEY='witness-lexington-s1-v1';
+function alarm(g) { g.click('begin');g.click('skip');g.click('rewind');g.click('start-ride');g.click('interact');g.click('ask-source');g.click('accept');for(const id of ['lantern','orchard']){g.travel(id,id==='lantern'?28:10);g.click('record-alarm');}g.travel('parsonage',44); }
+function muster(g) {g.click('continue-dawn');g.click('start-muster');g.click('interact');g.click('accept-message');for(const id of ['near','far']){g.walkTo(id);g.click('record-listening');}g.walkTo('militia');g.click('deliver-message');g.click('ask-militia');g.click('close-dialog');g.walkTo('town');g.click('ask-town');g.click('close-dialog');g.walkTo('boundary');g.click('finish-muster');}
+function walkGreen(g,id) { g.click('travel-'+id);let n=0;while(g.snap().assisted&&n++<800)g.frame();assert(n<800);g.click('interact'); }
+function select(g,id,value){const n=g.doc.getElementById(id);assert(n,id);n.value=value;n.dispatch('change');}
+function type(g,id,text){const n=g.doc.getElementById(id);assert(n,id);n.focus();for(const ch of text){n.dispatch('keydown',{key:ch});g.key(ch);n.value=(n.value||'')+ch;n.dispatch('input');}}
+function reload(g){const h=boot(g.storage);h.click('load');h.frame();return h;}
+const endings=[
+ 'I think the regulars fired first. Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first. His diary is an opposing account, and I think his blame might reflect his own side. The documents disagree, so I cannot identify an individual from smoke alone. I would need more evidence to be certain.',
+ 'I think the militia fired first. Barker describes one or two shots first in his diary. The militia depositions say the regulars fired first, however their own side might have reasons to deny starting the firing. Revere had a house blocking his view, so his observation cannot tell us everything. I think the British account is more likely, but I would still compare dates and positions before making a stronger claim.',
+ 'I cannot tell who fired first. Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first, while the militia depositions blame the regulars. These accounts disagree and I cannot tell which report captures the first trigger pull. The later letter comes from the same witness. Hearing and smoke could support a possibility without proving a person fired.'
+];
+for(const spot of ['corner','edge']) {
+ let g=boot();alarm(g);muster(g);
+ check('S2 checkpoint migration retains alarm/dawn '+spot,()=>{const s=JSON.parse(g.storage[KEY]);delete s.run.green;g.storage[KEY]=JSON.stringify(s);g=reload(g);assert.equal(g.snap().run.visited.length,2);assert(g.snap().run.dawn.boundary);});
+ g.click('continue-green');g.frame();
+ check('Green early interaction disabled '+spot,()=>assert(g.doc.getElementById('interact').disabled));
+ check('Green keyboard bounds '+spot,()=>{g.key('a');g.frames(20);g.release('a');assert.equal(g.snap().run.green.x,0);g.key('w');g.frames(200);g.release('w');assert.equal(g.snap().run.green.z,-20);});
+ g.click('travel-'+spot);g.frames(10);g.click('notebook');let before=JSON.stringify(g.snap().run.green);g.frames(20);
+ check('Notebook freezes Green travel '+spot,()=>{assert.equal(JSON.stringify(g.snap().run.green),before);assert(!g.snap().assisted);});g.click('close-dialog');
+ walkGreen(g,spot);assert.equal(g.snap().run.phase,'green-event');g.frames(145);
+ check('Pause freezes pivot '+spot,()=>{g.click('pause');const t=g.snap().elapsed;g.frames(40);assert.equal(g.snap().elapsed,t);g.click('resume');});
+ check('Interrupted event restarts honest observation '+spot,()=>{g=reload(g);assert.equal(g.snap().run.phase,'green-event');assert(!g.snap().run.green.observed);assert(g.snap().elapsed<0.1);});
+ g.frames(320);g.click('to-shelter');walkGreen(g,'shelter');
+ check('Shelter checkpoint survives refresh '+spot,()=>{g=reload(g);assert.equal(g.snap().run.phase,'shelter');assert(g.doc.getElementById('enter-study'));assert(g.snap().run.green.sheltered);});
+ g.click('shelter-notebook');check('Notebook separates Green from sources '+spot,()=>assert(g.host.querySelector('dialog').textContent.includes('not primary testimony')));g.click('close-dialog');g.click('enter-study');
+ check('Ranking unavailable until all sources inspected '+spot,()=>assert(!g.doc.getElementById('rank-0')));
+ for(const c of g.ctx.WG_DATA.cards){select(g,'document',c.id);if(c.id==='revere1775')assert(g.host.querySelector('.card').textContent.includes('Document paraphrase: Revere says'));g.click('inspect');assert(g.doc.getElementById('inspect').disabled);}
+ check('Both accounts and Doolittle framing inspected '+spot,()=>{assert.equal(g.snap().run.green.inspected.length,9);select(g,'document','doolittle');assert(g.host.textContent.includes('artist pictured'));});
+ select(g,'rank-0','barker');select(g,'rank-1','barker');
+ check('Duplicate ranking cannot continue '+spot,()=>assert(g.doc.getElementById('choose-belief').disabled));
+ select(g,'rank-1','revere1775');type(g,'limitation','The diary is only one observer’s account.');g.click('choose-belief');g.click('belief-unsure');
+ g.click('check-hypothesis');check('Militia account preset accepted '+spot,()=>{assert(g.host.querySelector('#hypothesis-result').textContent.includes('Fits the inherited'));assert(g.snap().run.green.belief==='unsure');});
+ select(g,'account','british');g.click('check-hypothesis');check('British preset also accepted '+spot,()=>assert(g.host.querySelector('#hypothesis-result').textContent.includes('Fits the inherited')));
+ for(const a of ['stopped','even']){select(g,'aftermath',a);g.click('check-hypothesis');check('Hard facts reject '+a+' '+spot,()=>assert(g.host.querySelector('#hypothesis-result').textContent.includes('Contradicts the inherited')));}
+ select(g,'aftermath','fewshots');g.click('check-hypothesis');g.click('write-essay');
+ check('Overlay Tab includes essay text and wraps form controls '+spot,()=>{g.doc.activeElement=g.host;g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-text');g.key('Tab',{shiftKey:true});assert.equal(g.doc.activeElement.id,'essay-notebook');g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-text');});
+ type(g,'essay-text','I believe the regulars fired first.');g.click('check-essay');check('Short unsupported answer fails '+spot,()=>assert(!g.doc.getElementById('finish-investigation')));
+ check('Paste, drop, beforeinput blocked '+spot,()=>{const n=g.doc.getElementById('essay-text');for(const kind of ['paste','drop']){let stopped=false;n.dispatch(kind,{preventDefault(){stopped=true;}});assert(stopped);}let stopped=false;n.dispatch('beforeinput',{inputType:'insertFromPaste',preventDefault(){stopped=true;}});assert(stopped);assert.equal(g.snap().run.green.tel.pasteAttempts,2);assert.equal(g.snap().run.green.tel.dropAttempts,1);});
+ check('Page exit flushes focused time '+spot,()=>{const ta=g.doc.getElementById('essay-text');ta.focus();g.frames(20);g.events.pagehide.forEach(fn=>fn());assert(JSON.parse(g.storage[KEY]).run.green.tel.msFocused>=1000);});
+ const draft=g.snap().run.green.essay;g.click('essay-documents');select(g,'document','revere1798');g.click('return-essay');
+ check('Document visit and typing shortcuts preserve draft '+spot,()=>{assert.equal(g.doc.getElementById('essay-text').value,draft);assert.equal(g.snap().run.phase,'essay');});
+ g=reload(g);check('Essay refresh retains draft and counters '+spot,()=>{assert.equal(g.doc.getElementById('essay-text').value,draft);assert(g.snap().run.green.tel.keystrokes>0);assert.equal(g.snap().run.green.tel.dropAttempts,1);});
+ const n=g.doc.getElementById('essay-text');n.value='';n.dispatch('input');type(g,'essay-text',endings[spot==='corner'?0:2]);g.click('check-essay');g.click('finish-investigation');
+ check('Passing essay completes and resumes '+spot,()=>{g=reload(g);assert.equal(g.snap().run.phase,'finished');assert(g.host.textContent.includes('Authorship')||g.host.textContent.includes('authorship'));});
+ g.click('restart');g.click('confirm-restart');check('Restart clears S3 and prior slices '+spot,()=>assert.equal(Object.keys(g.storage).length,0));
+}
+const g=boot(),C=g.ctx.WL_CHECK,D=g.ctx.WG_DATA;
+for(const text of endings)check('Either side and uncertainty content pass '+text.slice(0,25),()=>assert(C.essay(text,D.cards.map(c=>c.id),null).passed));
+check('Uninspected references and invented speech do not count',()=>{assert.equal(C.essay(endings[0],[],null).refs.length,0);assert(!C.essay('Keep together. Listen for orders.',[],null).passed);});
+check('Same card counted once; own hypothesis counts once',()=>{const h={version:{side:'militia',...D.sides.militia.preset}};const r=C.essay('I picked a regular in front and a charge in my game. Revere saw smoke in front and a house blocked the view.', ['revere1775'],h);assert.equal(r.refs.length,1);assert.equal(r.criteria.evidence.count,2);});
+check('Scoring marks match exact S2 base',()=>{const src=require('node:child_process').execFileSync('git',['show','3d10e9ad93b483e70c69bc7ea047555dc367cdab:data/evidence.js'],{cwd:ROOT,encoding:'utf8'}),old={};new Function('window',src)(old);for(const [card,tab] of Object.entries(old.WG_DATA.table))for(const [dim,choices] of Object.entries(tab))for(const [choice,mark] of Object.entries(choices))assert.equal(D.table[card][dim][choice][0],mark[0]);assert.equal(JSON.stringify(D.shooters),JSON.stringify(old.WG_DATA.shooters));});
+check('Invalid future checkpoints rejected',()=>{for(const patch of [s=>{s.phase='study'},s=>{s.green.essay=42},s=>{s.green.tel.inputEvents=-1}]){const s={phase:'muster-complete',accepted:true,asked:true,visited:['lantern','orchard'],returned:true,x:0,z:44,dawn:{met:true,delivered:true,listened:['near','far'],questions:['militia','town'],boundary:true,x:0,z:-15},green:g.ctx.WL_SLICE.fresh()};patch(s);const b=boot({[KEY]:JSON.stringify({version:1,run:s})});assert(!b.doc.getElementById('load'));}});
+check('Storage denial keeps live slice playable',()=>{const b=boot(new Proxy({}, {get(){throw Error('denied')},set(){throw Error('denied')}}));alarm(b);muster(b);b.click('continue-green');b.frame();walkGreen(b,'edge');b.frames(320);b.click('to-shelter');walkGreen(b,'shelter');b.click('enter-study');assert(!b.snap().storageOK);assert.equal(b.snap().run.phase,'study');assert(b.host.querySelector('.card').textContent.includes('Saving is unavailable. Refresh will lose this run.'));});
+console.log(JSON.stringify({kind:'DOM/renderer simulation; not browser acceptance',checks:checks.length,results:checks},null,2));

@@ -88,3 +88,7 @@ The MASSAR page visually marks the whole paragraph as struck through. Retain tha
 The seven challenged IDs now have public historical references and relevant passages in this design packet. The count gap is resolved with Willard's qualified estimate and the differing NPS scope, not by treating the spec as evidence. Source completion belongs to this design review and is not deferred to a playable slice.
 
 Wikipedia is used as an explicitly identified secondary account, with its book citations recorded as citations rather than falsely claimed readbacks. Primary transcriptions are attributed to MHS, MASSAR, DocsTeach, NPS's diary excerpt, and the specified 1855 Tomlinson edition. No source was uploaded or edited. Some direct HTTP fetches returned 403 or 502; the browser research tool supplied the public DocsTeach, MASSAR, and Wikipedia passages. This packet does not claim every referenced book or catalog landing page was independently opened.
+
+## Doolittle image
+
+`[DOOLITTLE]`: Amos Doolittle, *The Battle of Lexington, April 19, 1775. Plate I*, Yale University Art Gallery object 2482, accession 1920.25a-d. The inherited local image, object link, IIIF provenance, and CC0 rights statement are registered in [CREDITS.md](CREDITS.md#amos-doolittle-the-battle-of-lexington-april-19-1775-plate-i-1775). The picture shows how an artist pictured the British firing. It cannot prove who fired first. No new network readback was made in WL-S3.

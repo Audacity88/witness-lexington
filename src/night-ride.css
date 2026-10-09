@@ -40,3 +40,12 @@
   .wl .top { inset:6px 8px auto; }
   .wl button { padding:7px 10px; }
 }
+
+.wl .card label { display:block; margin:12px 0 4px; font-weight:600; }
+.wl .card select, .wl .card textarea { display:block; width:100%; min-height:44px; background:#0c182c; color:#f4f1e7; border:1px solid #8b9aaa; border-radius:6px; padding:10px; font:inherit; }
+.wl .card textarea { resize:vertical; }
+.wl .card select:focus-visible, .wl .card textarea:focus-visible { outline:3px solid #ffda8d; outline-offset:2px; }
+.wl .document-image { display:block; width:100%; height:auto; margin:12px 0; }
+.wl blockquote { margin:12px 0; border-left:3px solid #ffda8d; padding:8px 12px; }
+.wl #hypothesis-result, .wl #essay-result { margin:12px 0; }
+.wl .card > button { margin:6px 8px 2px 0; }

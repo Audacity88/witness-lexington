@@ -38,29 +38,29 @@ A version is **NOT ACCEPTED** if any *hard fact* card is red. Testimony cards ma
 | An officer's pistol (`officer`) | R | He says the militia fired first, not an officer. |
 | Someone hidden (`hidden`) | - | He blames the militia; your hidden shooter could be anyone. |
 
-## Militia depositions (1775) — testimony
+## John Parker’s sworn deposition (April 25, 1775) — testimony
 
 | shooter | mark | why |
 |---|---|---|
-| A regular (`regular`) | G | They say the regulars fired first. |
-| An officer's pistol (`officer`) | G | They blame the regulars — an officer's pistol is on the regulars' side. |
-| A militiaman (`militiaman`) | R | They say the regulars fired first, not the militia. |
-| Someone hidden (`hidden`) | - | They blame the regulars; your hidden shooter could be anyone. |
+| A regular (`regular`) | G | Parker attributes the unprovoked attack to the regulars. |
+| An officer's pistol (`officer`) | G | Parker blames the regulars; an officer's pistol is on their side. |
+| A militiaman (`militiaman`) | R | Parker attributes the unprovoked attack to the regulars, rather than the militia. |
+| Someone hidden (`hidden`) | - | Parker blames the regulars; your hidden shooter could be anyone. |
 
 ## Doolittle engraving (1775) — testimony
 
 | shooter | mark | why |
 |---|---|---|
-| A regular (`regular`) | G | It shows the British firing. |
-| An officer's pistol (`officer`) | G | It shows the British firing. |
-| A militiaman (`militiaman`) | R | It shows the British firing, not the militia. |
+| A regular (`regular`) | G | It shows how an artist pictured the British firing. |
+| An officer's pistol (`officer`) | G | It shows how an artist pictured the British firing. |
+| A militiaman (`militiaman`) | R | It shows how an artist pictured the British firing, rather than the militia. |
 
 | aftermath | mark | why |
 |---|---|---|
-| Regulars fire and charge (`volley`) | G | It shows the British firing. |
-| A few militia fire back (`fewshots`) | G | It shows the British firing. |
-| Officers stop it at once (`stopped`) | R | It shows the British firing — in your version they never fire a volley. |
-| A long, even gunfight (`even`) | G | It shows the British firing. |
+| Regulars fire and charge (`volley`) | G | It shows how an artist pictured the British firing. |
+| A few militia fire back (`fewshots`) | G | It shows how an artist pictured the British firing. |
+| Officers stop it at once (`stopped`) | R | It shows how an artist pictured the British firing; your version has no volley. |
+| A long, even gunfight (`even`) | G | It shows how an artist pictured the British firing. |
 
 ## Numbers — HARD FACT
 

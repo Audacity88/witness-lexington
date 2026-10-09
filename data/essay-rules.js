@@ -21,7 +21,7 @@ window.WG_ESSAY = {
     { id: 'revere-pistol',  group: 'revere1798', label: '"appeared to be a Pistol"', any: ["pistol"] },
     { id: 'revere-later',   group: 'revere1798', label: "Revere's 1798 letter came later (same witness)", any: ["1798", "belknap", "(later|years later|23 years)[^.]{0,40}(letter|account|wrote|story)", "same witness"] },
     { id: 'revere-roar',    group: 'revere1798', label: 'two Guns, then a Continual roar', any: ["\\broar\\b", "two guns", "musquetry"] },
-    { id: 'barker-shots',   group: 'barker',     label: "Barker's diary: the militia fired two shots first", any: ["\\bbarker\\b", "\\bdiary\\b", "two shots"] },
+    { id: 'barker-shots',   group: 'barker',     label: "Barker's diary: the militia fired one or two shots first", any: ["\\bbarker\\b", "\\bdiary\\b", "one or two shots"] },
     { id: 'depositions',    group: 'depositions', label: 'Militia depositions: the regulars fired first', any: ["depositions?", "sworn", "testimon(y|ies)"] },
     { id: 'doolittle-art',  group: 'doolittle',  label: "Doolittle's engraving is an artist's picture", any: ["doolittle", "engraving", "\\bartist", "\\bpicture\\b", "\\bdrawing\\b"] },
     { id: 'outcome',        group: 'outcome',    label: '8 colonists killed and 10 wounded vs 1 British soldier wounded', any: ["\\b8\\b[^.]{0,25}(killed|dead|died|colonist)", "\\beight\\b[^.]{0,25}(killed|dead|died|colonist)", "\\b(10|ten)\\b[^.]{0,15}wounded", "(only )?(1|one)[^.]{0,20}(british|redcoat|regular|soldier)[^.]{0,20}(wounded|hurt)"] },
@@ -62,10 +62,10 @@ window.WG_ESSAY = {
     length: 'Write a bit more: aim for at least {min} words (you have {n}).',
     refs0: 'Use the evidence! Mention at least 2 details from the cards, like the house that blocked Revere\u2019s view, the "Pistol", or 8 killed vs 1 wounded.',
     refs1: 'Good start with {got}. Add one more piece of evidence from a different card.',
-    otherNotPlayed: 'You haven\u2019t addressed {other} yet \u2014 try playing it, then say why it is weaker or still possible.',
+    otherNotPlayed: 'You haven\u2019t addressed {other} yet \u2014 inspect its document, then say why it is weaker or still possible.',
     otherPlayed: 'You haven\u2019t addressed {other} yet. Say why it is weaker \u2014 or why it is still possible.',
     weigh: 'You mention both sides. Now say WHY one is weaker or could still be true (try "but", "however", "might").',
     stance: 'Tip: say clearly which side you think fired first (or that you can\u2019t tell).',
-    own: 'Bonus idea: tell what happened in YOUR reenactment, e.g. which card turned red when you picked the shooter.'
+    own: 'Bonus idea: tell what happened in YOUR tested hypothesis, e.g. which card turned red when you picked the shooter.'
   }
 };

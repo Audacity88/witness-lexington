@@ -622,6 +622,48 @@
         } };
     }
 
+    // WL-S3 uses no shooter plan or firing events. The pivot has no origin to reveal.
+    function makeGreen(lex, stops) {
+      var walkers = makeDawn(lex, stops), blocker = mesh(new T.BoxGeometry(12, 8, 1), mat(0x73533d));
+      walkers.group.add(blocker); blocker.visible = false;
+      return { group: walkers.group,
+        pose: function (x, z, dx, dz, time, phase, t, spot, yaw) {
+          lex.poseCutscene(phase === 'green-event' ? Math.min(23, 14 + t * 1.5) : 14);
+          lex.regs.forEach(function (r) { r.visible = true; });
+          lex.horse.visible = phase === 'green-event' && t >= 3;
+          if (lex.horse.visible) lex.horse.position.z = lerp(22, 6.6, ease(clamp01((t - 3) / 3)));
+          lex.hidden.visible = false; lex.ring.visible = false;
+          Object.keys(lex.markers).forEach(function (k) { lex.markers[k].visible = false; });
+          lex.fx.clear(); walkers.pose(x, z, dx, dz, time);
+          walkers.rings.forEach(function (r, i) { r.visible = phase === 'shelter' ? stops[i].id === 'shelter' : phase === 'green'; });
+          // Hide destination labels during observation so they cannot float through the obstruction.
+          walkers.group.children.forEach(function (c) { if (c.isSprite) c.visible = ['green', 'shelter'].includes(phase); });
+          blocker.visible = phase === 'green-event' && t >= 6 && t < 10;
+          if (phase === 'green-event') {
+            time = t;
+            var px = spot === 'corner' ? 18 : 10;
+            cam.position.set(px, 1.9, -14); cam.lookAt(0, 1.8, 5);
+            blocker.position.set(px - 0.9, 3, -12); blocker.rotation.y = -Math.atan2(px, 19);
+            walkers.eli.visible = false;
+            if (t >= 10) {
+              var k = Math.min(1, (t - 10) / 5);
+              lex.militia.forEach(function (m, i) { m.position.x += k * (i % 2 ? 6 : -6); m.position.z -= k * 8; walkLegs(m, time, 10); });
+              lex.regs.forEach(function (r) { if (r.userData.adv) { r.position.z -= k * 4; walkLegs(r, time, 10); } });
+              // Diffuse aftermath smoke has no first-shot muzzle, flash, direction, or identity.
+              lex.fx.puff(new T.Vector3(0, 1.5, 2), 5); lex.fx.update(1.5);
+            }
+          } else {
+            walkers.eli.visible = !['study', 'hypothesis', 'essay', 'finished'].includes(phase);
+            cam.position.set(x + Math.sin(yaw) * 10, 8, z + Math.cos(yaw) * 10); cam.lookAt(x, 1, z + 3);
+            if (phase !== 'green') {
+              lex.militia.forEach(function (m) { m.position.z -= 8; });
+              lex.regs.forEach(function (r) { if (r.userData.adv) r.position.z -= 4; });
+            }
+          }
+        }
+      };
+    }
+
     // ---------- cameras, picking ----------
     var cam = new T.PerspectiveCamera(50, 1, 0.1, 600), camB = new T.PerspectiveCamera(50, 1, 0.1, 600);
     var controls = new T.OrbitControls(cam, cv);
@@ -636,7 +678,7 @@
 
     return {
       renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls,
-      makeLex: makeLex, makeNight: makeNight, makeDawn: makeDawn, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
+      makeLex: makeLex, makeNight: makeNight, makeDawn: makeDawn, makeGreen: makeGreen, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
       globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; } },
       pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3
     };

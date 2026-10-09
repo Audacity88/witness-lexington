@@ -1,4 +1,4 @@
-/* WL-S1/S2: opening, alarm errand, and dawn muster. No scoring changes. */
+/* WL-S1/S2/S3: the playable day and modern investigation. No scoring changes. */
 (function () {
   'use strict';
   var D = window.WL_NIGHT, B = window.WL_DAWN, host = document.getElementById('witness-game');
@@ -7,10 +7,14 @@
   host.classList.add('wl');
   var W = window.WGWorld.create(host), lex = W.makeLex(), night = W.makeNight();
   W.canvas.setAttribute('aria-label', 'Low-poly Lexington scene. Use labeled travel buttons or WASD to ride or walk.');
-  var state = fresh(), saved = readSave();
+  var state = fresh(), saved = readSave(), slice;
+  var S = window.WL_SLICE;
+  function later() { return S.phases.includes(state.phase); }
+  function modern() { return S.modern.includes(state.phase); }
+  function greenWalking() { return ['green', 'shelter'].includes(state.phase) && !state.green.sheltered; }
 
   function freshDawn() { return { met: false, delivered: false, listened: [], questions: [], boundary: false, x: -11, z: -9 }; }
-  function fresh() { return { phase: 'intro', accepted: false, asked: false, visited: [], returned: false, x: 0, z: 44, dawn: freshDawn() }; }
+  function fresh() { return { phase: 'intro', accepted: false, asked: false, visited: [], returned: false, x: 0, z: 44, dawn: freshDawn(), green: window.WL_SLICE.fresh() }; }
   function uniqueIDs(list, allowed) {
     return Array.isArray(list) && list.length <= allowed.length && new Set(list).size === list.length &&
       list.every(function (id) { return allowed.includes(id); });
@@ -24,18 +28,20 @@
   }
   function musterDone() { var d = state.dawn; return d.delivered && d.listened.length === 2 && d.questions.length === 2; }
   function onFoot() { return state.phase === 'muster'; }
-  function playable() { return state.phase === 'ride' || onFoot(); }
+  function playable() { return state.phase === 'ride' || onFoot() || greenWalking() || state.phase === 'green-event'; }
   function valid(s) {
-    return s && ['rewind', 'ride', 'complete', 'dawn', 'muster', 'muster-complete'].includes(s.phase) && typeof s.accepted === 'boolean' &&
+    return s && ['rewind', 'ride', 'complete', 'dawn', 'muster', 'muster-complete'].concat(window.WL_SLICE.phases).includes(s.phase) && typeof s.accepted === 'boolean' &&
       typeof s.asked === 'boolean' && typeof s.returned === 'boolean' && Array.isArray(s.visited) &&
       s.visited.length <= 2 && new Set(s.visited).size === s.visited.length &&
       s.visited.every(function (id) { return id === 'lantern' || id === 'orchard'; }) &&
       Number.isFinite(s.x) && Math.abs(s.x) <= 1.6 && Number.isFinite(s.z) && s.z >= 0 && s.z <= 46 &&
       (!s.visited.length || s.accepted) && (!s.returned || s.visited.length === 2) &&
-      (!['complete', 'dawn', 'muster', 'muster-complete'].includes(s.phase) || s.returned) &&
+      (!['complete', 'dawn', 'muster', 'muster-complete'].concat(window.WL_SLICE.phases).includes(s.phase) || s.returned) &&
       (s.phase !== 'rewind' || !s.accepted) && validDawn(s.dawn) &&
       (!['rewind', 'ride', 'complete', 'dawn'].includes(s.phase) || !s.dawn.met && !s.dawn.delivered && !s.dawn.listened.length && !s.dawn.questions.length && !s.dawn.boundary) &&
-      (s.phase !== 'muster-complete' || s.dawn.boundary);
+      (!['muster-complete'].concat(window.WL_SLICE.phases).includes(s.phase) || s.dawn.boundary) &&
+      window.WL_SLICE.valid(s.green, s.phase) &&
+      (window.WL_SLICE.phases.includes(s.phase) || !s.green.spot && !s.green.observed && !s.green.sheltered && !s.green.inspected.length);
   }
   function readSave() {
     try {
@@ -43,15 +49,18 @@
       try { s = JSON.parse(raw); } catch (e) { return null; }
       // Upgrade the WL-S1 checkpoint in place, keeping its alarm and notebook.
       if (s && s.version === 1 && s.run && !s.run.dawn && ['rewind', 'ride', 'complete'].includes(s.run.phase)) s.run.dawn = freshDawn();
+      if (s && s.version === 1 && s.run && !s.run.green) s.run.green = window.WL_SLICE.fresh();
       return s && s.version === 1 && valid(s.run) ? s.run : null;
     }
     catch (e) { storageOK = false; return null; }
   }
   function save() {
-    if (!['rewind', 'ride', 'complete', 'dawn', 'muster', 'muster-complete'].includes(state.phase)) return;
+    if (slice) slice.finishFocus(true);
+    if (!['rewind', 'ride', 'complete', 'dawn', 'muster', 'muster-complete'].concat(window.WL_SLICE.phases).includes(state.phase)) return;
     try { localStorage.setItem(STORE, JSON.stringify({ version: 1, run: state })); saved = JSON.parse(JSON.stringify(state)); }
     catch (e) { storageOK = false; }
     notice.textContent = storageOK ? 'Progress saves on this device.' : 'Saving is unavailable. Refresh will lose this run.';
+    if (studyNotice) studyNotice.textContent = notice.textContent;
   }
   function el(tag, cls, text) {
     var n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n;
@@ -71,7 +80,8 @@
   var feedback = el('small'); feedback.setAttribute('role', 'status');
   var notice = el('div', 'notice'); notice.textContent = storageOK ? 'Progress saves on this device.' : 'Saving is unavailable. Refresh will lose this run.';
   actionRow.append(interactButton, feedback); panel.append(objective, route, actionRow, notice); host.appendChild(panel);
-  var overlay = el('section', 'overlay'), card = el('div', 'card'); overlay.appendChild(card); host.appendChild(overlay);
+  var overlay = el('section', 'overlay'), card = el('div', 'card'), studyNotice = el('p', 'notice');
+  studyNotice.setAttribute('role', 'status'); overlay.appendChild(card); host.appendChild(overlay);
   var dialog = document.createElement('dialog'); host.appendChild(dialog);
   dialog.addEventListener('close', function () {
     clearMovement();
@@ -112,21 +122,33 @@
       var link = el('a', '', 'Passage and source reference'); link.href = 'SOURCES.md#' + s.anchor;
       link.target = '_blank'; link.rel = 'noopener'; a.appendChild(link); dialog.appendChild(a);
     });
-    paragraph(dialog, 'Full source register: CREDITS.md. Historical documents, evidence ranking, and the essay arrive in a later slice.');
+    dialog.appendChild(el('h3', '', 'Green observations · fictional gameplay'));
+    if (state.green.observed) paragraph(dialog, window.WL_GREEN.records[state.green.spot]);
+    if (state.green.sheltered) paragraph(dialog, window.WL_GREEN.records.shelter);
+    if (!state.green.observed) paragraph(dialog, 'No Green observations recorded yet.');
+    if (state.green.sheltered) {
+      dialog.appendChild(el('h3', '', 'Inspected historical sources'));
+      window.WG_DATA.cards.filter(function (c) { return state.green.inspected.includes(c.id); }).forEach(function (c) { paragraph(dialog, c.title + ' ' + c.source); });
+      if (state.green.rank.length === 2) paragraph(dialog, 'Your usefulness order: ' + state.green.rank.map(function (id) { return window.WG_DATA.cards.find(function (c) { return c.id === id; }).title; }).join(', ') + '. Your limitation: ' + state.green.limitation);
+      if (state.green.hypothesis) { var v = state.green.hypothesis.version, data = window.WG_DATA; paragraph(dialog, 'Your last tested hypothesis: ' + data.shooters[v.shooter].label + '; ' + data.zones[v.location].label + '; ' + data.aftermaths[v.aftermath].label + '. This was a test, not a witnessed first shot.'); }
+    }
+    paragraph(dialog, 'Full source register: CREDITS.md. Inspect historical documents individually in the evidence room.');
     closeControl();
   }
   function showCard(title, text, tag) {
     card.replaceChildren(); if (tag) paragraph(card, tag, 'tag'); card.appendChild(el('h1', '', title)); paragraph(card, text);
+    studyNotice.textContent = notice.textContent; if (later()) card.appendChild(studyNotice);
     overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-label', title);
     overlay.hidden = false; overlay.classList.toggle('black', state.phase === 'blackout');
   }
   function go(phase) {
+    if (slice) slice.finishFocus();
     clearMovement(); paused = false; elapsed = 0; state.phase = phase; feedback.textContent = '';
     if (dialog.open) dialog.close(); save(); render();
   }
   function rewind() { go('rewind'); }
   function render() {
-    chapter.textContent = ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
+    chapter.textContent = later() ? modern() ? 'Modern study · evidence and answer' : 'Lexington Green · reconstructed scene' : ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
     panel.hidden = !playable(); overlay.hidden = true;
     top.inert = paused || !playable() && state.phase !== 'opening';
     panel.inert = paused || !playable() && state.phase !== 'opening';
@@ -138,7 +160,7 @@
       card.appendChild(button('Resume', function () { setPaused(false); }, 'resume', true)); return;
     }
     if (state.phase === 'intro') {
-      showCard('Witness Lexington', 'A warning in the night. A question at dawn. Play Eli, a fictional 12-year-old Lexington resident.', 'Slices A and B · Night alarm and dawn muster');
+      showCard('Witness Lexington', 'A warning in the night. A question at dawn. Play Eli, a fictional 12-year-old Lexington resident.', 'Night alarm, dawn muster, Green, and investigation');
       paragraph(card, 'Your errands are dramatized. Historical context has source labels in your notebook. No combat or timer.');
       var start = button('Begin the opening', function () { go('opening'); }, 'begin', true); card.appendChild(start);
       if (saved) card.appendChild(button('Resume saved run', function () { state = JSON.parse(JSON.stringify(saved)); go(state.phase); }, 'load'));
@@ -191,18 +213,19 @@
     } else if (state.phase === 'muster-complete') {
       showCard('Muster complete', 'Eli delivered the message, compared both listening spots, and found the spectator boundary.', 'WL-S2 checkpoint · Fictional gameplay');
       paragraph(card, 'You heard a complete simulated instruction nearby and missing words farther away. A partial order does not establish intent or a first shooter.');
-      paragraph(card, 'The Green, historical evidence room, and essay arrive in WL-S3. They are not playable in this build.');
+      paragraph(card, 'Choose a spectator spot on the Green, then investigate historical documents in the modern evidence room.');
+      card.appendChild(button('Continue to the Green', function () { yaw = 0; go('green'); }, 'continue-green', true));
       paragraph(card, storageOK ? 'Checkpoint saved on this device.' : 'Saving is unavailable. Keep this page open to retain your notebook.');
       card.appendChild(button('Read the notebook', notebook, 'end-notebook', true));
       card.appendChild(button('Replay the opening', function () { replayPhase = state.phase; replaying = true; go('opening'); }, 'replay'));
       card.appendChild(button('Restart this run', restart, 'restart'));
-    }
+    } else if (later()) slice.render();
   }
   function restart() {
     openDialog('Restart this run?'); paragraph(dialog, 'This clears the saved run and Eli\'s gameplay observations.');
     dialog.appendChild(button('Clear and restart', function () {
       try { localStorage.removeItem(STORE); } catch (e) { storageOK = false; }
-      saved = null; state = fresh(); replaying = false; dialog.close(); go('intro');
+      saved = null; slice.reset(); state = fresh(); replaying = false; dialog.close(); go('intro');
     }, 'confirm-restart', true)); closeControl();
   }
   function caption() {
@@ -236,7 +259,8 @@
     interactButton.disabled = !s || (!state.accepted && s.id !== 'parsonage');
   }
   function interact() {
-    if (!playable() || paused || dialog.open) return;
+    if (!playable() || paused || dialog.open || !overlay.hidden) return;
+    if (greenWalking()) { slice.interact(); return; }
     if (onFoot()) { interactDawn(); return; }
     var s = nearby(); if (!s || (!state.accepted && s.id !== 'parsonage')) return;
     if (s.id === 'parsonage' && state.visited.length === 2) { state.returned = true; go('complete'); return; }
@@ -310,15 +334,16 @@
     var k = e.key.toLowerCase();
     if (dialog.open) return;
     if (k === 'tab' && !overlay.hidden) {
-      var buttons = Array.from(card.querySelectorAll('button')).filter(function (b) { return !b.disabled; });
+      var buttons = Array.from(card.querySelectorAll('button, a[href], select, textarea, input')).filter(function (b) { return !b.disabled && b.getClientRects().length; });
       var first = buttons[0], end = buttons[buttons.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); end.focus(); }
       else if (!e.shiftKey && document.activeElement === end || !card.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
       return;
     }
+    if (['TEXTAREA', 'INPUT', 'SELECT'].includes(e.target.tagName)) return;
     if (k === 'escape') { e.preventDefault(); setPaused(!paused); return; }
     if (k === 'n' && !e.repeat) { e.preventDefault(); notebook(); return; }
-    if (paused || !playable()) return;
+    if (paused || !playable() || !overlay.hidden || state.phase === 'green-event') return;
     if (movingKey(k)) { e.preventDefault(); keys[k] = true; target = null; }
     if (k === 'e' && !e.repeat) { e.preventDefault(); interact(); }
   });
@@ -327,7 +352,7 @@
   window.addEventListener('pagehide', save);
   document.addEventListener('visibilitychange', function () { if (document.hidden) { clearMovement(); setPaused(true); } });
   W.canvas.addEventListener('pointerdown', function (e) {
-    if (playable() && !paused && !dialog.open) { drag = e.clientX; W.canvas.setPointerCapture(e.pointerId); }
+    if (playable() && state.phase !== 'green-event' && !paused && !dialog.open && overlay.hidden) { drag = e.clientX; W.canvas.setPointerCapture(e.pointerId); }
   });
   W.canvas.addEventListener('pointermove', function (e) {
     if (drag !== null) { yaw += (drag - e.clientX) * 0.006; drag = e.clientX; }
@@ -338,6 +363,12 @@
     W.renderer.setSize(host.clientWidth, host.clientHeight, false);
     W.cam.aspect = host.clientWidth / Math.max(1, host.clientHeight); W.cam.updateProjectionMatrix();
   }
+  slice = S.create({ W: W, lex: lex, card: card, panel: panel, overlay: overlay, actionRow: actionRow, notice: notice,
+    route: route, objective: objective, interactButton: interactButton, el: el, paragraph: paragraph, button: button,
+    showCard: showCard, go: go, notebook: notebook, restart: restart, save: save,
+    state: function () { return state; }, target: function () { return target; }, setTarget: function (t) { target = t; },
+    elapsed: function () { return elapsed; }, tick: function (dt) { elapsed += dt; }
+  });
   new ResizeObserver(resize).observe(host); resize(); render();
   function frame(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -345,7 +376,11 @@
     if (state.phase === 'opening' && !paused && !dialog.open) {
       elapsed += dt; caption(); if (elapsed >= 22) go('blackout');
     }
-    if (opening) {
+    if (!later()) slice.hide();
+    if (later()) {
+      if (dawn) dawn.group.visible = false;
+      slice.frame(dt, now, !paused && !dialog.open, keys, yaw);
+    } else if (opening) {
       // No firing events or replay plan is ever invoked. Hide the seed's leading officer.
       if (dawn) dawn.group.visible = false;
       lex.regs.forEach(function (r) { r.visible = true; });
