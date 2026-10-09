@@ -7,7 +7,7 @@ window.WL_GREEN = {
   ],
   captions: [
     'Advance companies turn onto the Common. Pitcairn arrives from behind them. Simplified reconstruction. [COMMAND]',
-    'Your view is blocked. [Initial report, origin unclear.] Silent text simulation; no first shooter is shown. [PIVOT]',
+    'View blocked by a staged reconstruction. [Initial report, origin unclear.] Silent text simulation; no first shooter is shown. [PIVOT]',
     '[Further firing.] The militia scatter as regulars advance. Reconstructed aftermath; no wounds are shown. [OUTCOME] [CONTROL]'
   ],
   records: {

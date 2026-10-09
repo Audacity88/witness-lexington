@@ -4,8 +4,25 @@
   var D = window.WG_DATA, E = window.WG_ESSAY, C = window.WL_CHECK, G = window.WL_GREEN;
   var phases = ['green', 'green-event', 'shelter', 'study', 'hypothesis', 'essay', 'finished'];
   var modern = ['study', 'hypothesis', 'essay', 'finished'];
-  function telemetry() { return { keystrokes: 0, inputEvents: 0, deletes: 0, msFocused: 0, pasteAttempts: 0, dropAttempts: 0 }; }
-  function fresh() { return { x: 0, z: -15, spot: null, observed: false, sheltered: false, inspected: [], document: 'revere1775', rank: [], limitation: '', belief: null, hypothesis: null, essay: '', tel: telemetry() }; }
+  function telemetry() { return { keystrokes: 0, inputEvents: 0, deletes: 0, msFocused: 0, pasteAttempts: 0, dropAttempts: 0, typedChars: 0, unkeyedChars: 0, typingMs: 0, burst: 0, speedFlag: 0 }; }
+  function authorship(g) {
+    var t = g.tel, n = C.words(g.essay), ratio = g.essay.length ? t.typedChars / g.essay.length : 1;
+    var wpm = n * 60000 / Math.max(1, t.typingMs);
+    var flags = [];
+    if (t.pasteAttempts || t.dropAttempts) flags.push('paste/drop attempt');
+    if (g.essay.length >= E.telemetry.minCharsForRatio && ratio < E.telemetry.lowRatio) flags.push('low keystroke ratio');
+    if (t.unkeyedChars) flags.push('text inserted without matching keystrokes');
+    if (t.speedFlag || n >= E.telemetry.minWordsForSpeed && wpm > E.telemetry.maxWPM) flags.push('typing speed');
+    if (t.burst) flags.push('typing burst');
+    return { flags: flags, ratio: ratio, wordsPerMinute: Math.round(wpm), telemetry: Object.assign({}, t) };
+  }
+  function migrate(g) {
+    if (g && g.tel && !Object.prototype.hasOwnProperty.call(g.tel, 'typedChars')) {
+      Object.assign(g.tel, { typedChars: 0, unkeyedChars: g.essay ? g.essay.length : 0, typingMs: 0, burst: 0, speedFlag: 0 });
+      g.priorFlags = []; g.result = null;
+    }
+  }
+  function fresh() { return { x: 0, z: -15, spot: null, observed: false, sheltered: false, inspected: [], document: 'revere1775', rank: [], limitation: '', belief: null, hypothesis: null, essay: '', tel: telemetry(), priorFlags: [], result: null }; }
   function versionOK(v) { return v && ['militia', 'british'].includes(v.side) && D.shooters[v.shooter] && D.shooters[v.shooter].zones.includes(v.location) && D.aftermaths[v.aftermath]; }
   function ids(a, allow, max) { return Array.isArray(a) && a.length <= max && new Set(a).size === a.length && a.every(function (id) { return allow.includes(id); }); }
   function ranked(g) { return g.rank.length === 2 && g.limitation.trim().length >= 12; }
@@ -16,24 +33,31 @@
       !ids(g.inspected, cards, 9) || !cards.includes(g.document) || !ids(g.rank, g.inspected, 2) ||
       typeof g.limitation !== 'string' || g.limitation.length > 2000 || ![null, 'militia', 'british', 'unsure'].includes(g.belief) ||
       typeof g.essay !== 'string' || g.essay.length > 20000 || !g.tel ||
+      !Array.isArray(g.priorFlags) || !g.priorFlags.every(function (r) { return r && Array.isArray(r.flags) && r.flags.every(function (f) { return typeof f === 'string'; }) && Number.isFinite(r.wordsPerMinute); }) ||
       !Object.keys(telemetry()).every(function (k) { return Number.isFinite(g.tel[k]) && g.tel[k] >= 0; }) ||
       g.hypothesis !== null && (!g.hypothesis || !versionOK(g.hypothesis.version)) ||
       g.observed && !g.spot || g.sheltered && !g.observed || g.inspected.length && !g.sheltered) return false;
     if (phase === 'green-event' && !g.spot || phase === 'shelter' && !g.observed || modern.includes(phase) && !g.sheltered) return false;
     if (['hypothesis', 'essay', 'finished'].includes(phase) && (g.inspected.length !== 9 || !ranked(g) || !g.belief)) return false;
-    if (['essay', 'finished'].includes(phase) && !g.hypothesis) return false;
-    if (phase === 'finished' && !C.essay(g.essay, g.inspected, g.hypothesis).passed) return false;
+    if (['essay', 'finished'].includes(phase) && (!g.hypothesis || !C.score(g.hypothesis.version).accepted)) return false;
+    if (phase === 'finished' && (!C.essay(g.essay, g.inspected, g.hypothesis).passed || authorship(g).flags.length)) return false;
     return true;
   }
   function create(env) {
-    var scene = null, focusSince = null, draft = null;
+    var scene = null, focusSince = null, draft = null, body = env.card, actions = env.card;
     function g() { return env.state().green; }
     function p() { return env.state().phase; }
-    function add(text, cls) { env.paragraph(env.card, text, cls); }
-    function b(text, fn, id, primary) { var n = env.button(text, fn, id, primary); env.card.appendChild(n); return n; }
+    function add(text, cls) { env.paragraph(body, text, cls); }
+    function b(text, fn, id, primary) { var n = env.button(text, fn, id, primary); actions.appendChild(n); return n; }
+    function showCard(title, text) {
+      env.showCard(title, text);
+      body = env.el('div', 'card-scroll'); actions = env.el('div', 'card-actions');
+      Array.from(env.card.children).forEach(function (n) { body.appendChild(n); });
+      env.card.append(body, actions);
+    }
     function save() { env.save(); }
     function input(tag, label, id) {
-      var l = env.el('label', '', label), n = env.el(tag); n.id = id; l.htmlFor = id; env.card.append(l, n); return n;
+      var l = env.el('label', '', label), n = env.el(tag); n.id = id; l.htmlFor = id; body.append(l, n); return n;
     }
     function select(label, id, entries, value, change) {
       var n = input('select', label, id);
@@ -42,18 +66,18 @@
     }
     function source(c) {
       add(c.sourceLabel + ' ' + c.source, 'tag');
-      var a = env.el('a', '', 'Citation and passage'); a.href = 'SOURCES.md#' + c.anchor; a.target = '_blank'; a.rel = 'noopener'; env.card.appendChild(a);
+      var a = env.el('a', '', 'Citation and passage'); a.href = window.WL_SOURCES_URL || 'SOURCES.md#' + c.anchor; a.target = '_blank'; a.rel = 'noopener'; body.appendChild(a);
     }
     function showDocument() {
       var s = g(), c = D.cards.find(function (c) { return c.id === s.document; });
-      env.showCard('Evidence room · modern study', 'Read each source, then compare usefulness. This room is outside the 1775 story.');
+      showCard('Evidence room · modern study', 'Read each source, then compare usefulness. This room is outside the 1775 story.');
       add('Inspected ' + s.inspected.length + '/9. Sources are shown individually; your draft stays on this device.');
       select('Choose one document', 'document', D.cards.map(function (c) { return [c.id, c.title]; }), c.id, function (v) { s.document = v; render(); });
-      env.card.appendChild(env.el('h2', '', c.title + (c.date ? ' · ' + c.date : ''))); source(c);
-      if (c.id === 'doolittle') { var im = env.el('img'); im.src = 'assets/doolittle-plate1.webp'; im.alt = D.room.doolittle.alt; im.className = 'document-image'; env.card.appendChild(im); }
+      body.appendChild(env.el('h2', '', c.title + (c.date ? ' · ' + c.date : ''))); source(c);
+      if (c.id === 'doolittle') { var im = env.el('img'); im.src = window.WG_DOOLITTLE_SRC || 'assets/doolittle-plate1.webp'; im.alt = D.room.doolittle.alt; im.className = 'document-image'; body.appendChild(im); }
       else if (c.kind === 'testimony') add('Original scan not included. This card uses a cited excerpt or labeled paraphrase.');
-      if (c.quotes) c.quotes.forEach(function (q) { env.card.appendChild(env.el('blockquote', '', q)); });
-      if (c.summary) add('Document paraphrase: ' + c.summary);
+      if (c.quotes) c.quotes.forEach(function (q) { body.appendChild(env.el('blockquote', '', q)); });
+      if (c.summary) add((c.id === 'numbers' ? 'Reconstruction estimate: ' : 'Document paraphrase: ') + c.summary);
       if (c.flag) add(c.flag, 'tag'); add(c.limit);
       b(s.inspected.includes(c.id) ? 'Already inspected' : 'Record this source as inspected', function () { s.inspected.push(c.id); save(); render(); }, 'inspect', true).disabled = s.inspected.includes(c.id);
       var index = D.cards.indexOf(c);
@@ -65,7 +89,7 @@
       b('My scene notebook', env.notebook, 'study-notebook');
     }
     function ranking() {
-      var s = g(); env.card.appendChild(env.el('h2', '', 'Rank two sources by usefulness'));
+      var s = g(); body.appendChild(env.el('h2', '', 'Rank two sources by usefulness'));
       add('Choose the more useful source first. Explain a limitation in your own words. This reflection has no numerical score or official order.');
       ['First', 'Second'].forEach(function (label, i) {
         select(label + ' source', 'rank-' + i, [['', 'Choose a source']].concat(D.cards.map(function (c) { return [c.id, c.title]; })), s.rank[i] || '', function (v) {
@@ -88,7 +112,7 @@
       ready();
     }
     function belief() {
-      env.showCard('What do you believe so far?', 'A provisional belief is revisable. Testing an account does not prove it happened.');
+      showCard('What do you believe so far?', 'A provisional belief is revisable. Testing an account does not prove it happened.');
       [['militia', 'Regulars may have fired first'], ['british', 'Militia may have fired first'], ['unsure', 'I cannot tell yet']].forEach(function (o) {
         b(o[1], function () { g().belief = o[0]; draft = null; env.go('hypothesis'); }, 'belief-' + o[0], true);
       });
@@ -96,7 +120,7 @@
     function hypothesis() {
       var s = g(), old = draft || s.hypothesis && s.hypothesis.version;
       var v = old ? Object.assign({}, old) : Object.assign({ side: s.belief === 'british' ? 'british' : 'militia' }, D.sides[s.belief === 'british' ? 'british' : 'militia'].preset);
-      env.showCard('Test a hypothesis', 'Choose a shooter, an allowed location, and what follows. These are proposed possibilities, not a replay of a known first shot.');
+      showCard('Test a hypothesis', 'Choose a shooter, an allowed location, and what follows. These are proposed possibilities, not a replay of a known first shot.');
       add('Your provisional belief: ' + (s.belief === 'unsure' ? 'uncertain' : s.belief === 'militia' ? 'regulars may have fired first' : 'militia may have fired first') + '.');
       select('Account to test', 'account', Object.entries(D.sides).map(function (e) { return [e[0], e[1].label]; }), v.side, function (side) {
         // Changing accounts explicitly chooses its inherited preset, without changing belief.
@@ -104,52 +128,96 @@
       });
       select('Possible shooter', 'shooter', Object.entries(D.shooters).map(function (e) { return [e[0], e[1].label]; }), v.shooter, function (id) {
         v.shooter = id; if (!D.shooters[id].zones.includes(v.location)) v.location = D.shooters[id].zones[0];
-        location.replaceChildren(); zones(); result.replaceChildren();
+        location.replaceChildren(); zones(); clearResult();
       });
       var location = input('select', 'Allowed location', 'location');
       function zones() { D.shooters[v.shooter].zones.forEach(function (id) { var o = env.el('option', '', D.zones[id].label); o.value = id; location.appendChild(o); }); location.value = v.location; }
-      zones(); location.addEventListener('change', function () { v.location = location.value; result.replaceChildren(); });
-      select('Aftermath', 'aftermath', Object.entries(D.aftermaths).map(function (e) { return [e[0], e[1].label]; }), v.aftermath, function (id) { v.aftermath = id; result.replaceChildren(); });
-      var result = env.el('div'); result.id = 'hypothesis-result'; result.setAttribute('role', 'status'); env.card.appendChild(result);
+      zones(); location.addEventListener('change', function () { v.location = location.value; clearResult(); });
+      select('Aftermath', 'aftermath', Object.entries(D.aftermaths).map(function (e) { return [e[0], e[1].label]; }), v.aftermath, function (id) { v.aftermath = id; clearResult(); });
+      var writeAction = null;
+      function clearResult() { result.replaceChildren(); if (writeAction) { writeAction.remove(); writeAction = null; } }
+      var result = env.el('div'); result.id = 'hypothesis-result'; result.setAttribute('role', 'status'); body.appendChild(result);
       b('Check this hypothesis', function () {
         draft = Object.assign({}, v); var sc = C.score(v); s.hypothesis = { version: Object.assign({}, v) }; save(); result.replaceChildren();
         env.paragraph(result, sc.accepted ? 'Fits the inherited fact checks. This does not prove who fired first.' : 'Contradicts the inherited fact checks. Revise your hypothesis.');
-        // No side-by-side history of versions and no ready-made testimony counterargument.
-        var chosen = D.cards.find(function (c) { return c.id === s.document; });
-        env.paragraph(result, 'Current document: ' + chosen.title + ' · ' + ({ red: 'Contradicts', green: 'Fits', grey: 'Says nothing' })[sc.cards[chosen.id]] + ' ' + chosen.source);
-        sc.why[chosen.id].forEach(function (why) { env.paragraph(result, why); });
-        sc.redFacts.forEach(function (id) { var c = D.cards.find(function (c) { return c.id === id; }); env.paragraph(result, c.title + ' ' + c.source + ': ' + sc.why[id].join(' ')); });
-        env.paragraph(result, 'Testimony contradictions: ' + sc.redTestimony.length + '. Revisit individual sources to examine them.');
-        result.appendChild(env.button('Write my answer', function () { env.go('essay'); }, 'write-essay', true));
+        // Name every contradicting source for this test, regardless of the last viewed card.
+        sc.redFacts.concat(sc.redTestimony).forEach(function (id) {
+          var c = D.cards.find(function (c) { return c.id === id; });
+          env.paragraph(result, c.title + ' ' + c.source + ': ' + sc.why[id].join(' '));
+        });
+        if (writeAction) writeAction.remove();
+        writeAction = sc.accepted ? b('Write my answer', function () {
+          if (C.score(v).accepted) env.go('essay');
+        }, 'write-essay', true) : null;
       }, 'check-hypothesis', true);
       b('Change provisional belief', belief, 'change-belief'); b('Inspect documents', function () { env.go('study'); }, 'hypothesis-documents');
     }
     function finishFocus(continueFocus) { if (focusSince !== null) { g().tel.msFocused += performance.now() - focusSince; focusSince = continueFocus ? performance.now() : null; } }
     function essay() {
-      var s = g(); env.showCard('Your answer', E.question);
-      add('Use at least ' + E.minRefs + ' evidence references and at least ' + E.minWords + ' words. Address the opposing account and weigh it. Inspected historical cards count; your tested hypothesis can count once. Fictional speech is not primary testimony.');
+      var s = g(); showCard('Your answer', E.question);
+      add('Use at least ' + E.minRefs + ' evidence references and at least ' + E.minWords + ' words. Write at least three distinct claim sentences of five or more words each, connect evidence to your conclusion, and avoid repeated sentences or keyword lists. Address the opposing account and weigh it. Inspected historical cards count; your tested hypothesis can count once. Fictional speech is not primary testimony.');
       add('This is a local pattern check. Passing it does not settle history or confirm authorship. Confirmed outside authorship must be disqualified by teacher review outside this game.');
       var ta = input('textarea', 'Write your own answer', 'essay-text'); ta.rows = 8; ta.maxLength = 20000; ta.value = s.essay;
-      var count = env.el('p'), warning = env.el('p'); warning.id = 'paste-warning'; warning.setAttribute('role', 'status'); env.card.append(count, warning);
-      var result = env.el('div'); result.id = 'essay-result'; result.setAttribute('role', 'status'); env.card.appendChild(result);
-      function update() { count.textContent = C.words(s.essay) + ' / ' + E.minWords + ' words'; result.replaceChildren(); }
-      function blocked(e, kind) { e.preventDefault(); s.tel[kind === 'drop' ? 'dropAttempts' : 'pasteAttempts']++; warning.textContent = 'Paste and drop are off. Please type your own words. Attempts are review flags, not proof of AI use.'; save(); }
+      var count = env.el('p'), warning = env.el('p'); warning.id = 'paste-warning'; warning.setAttribute('role', 'status'); body.append(count, warning);
+      var result = env.el('div'); result.id = 'essay-result'; result.setAttribute('role', 'status'); body.appendChild(result);
+      var finish = null, pending = 0, lastInput = null, burstStart = null, burstChars = 0;
+      function update() {
+        count.textContent = C.words(s.essay) + ' / ' + E.minWords + ' words'; result.replaceChildren(); s.result = { content: null, authorship: authorship(s), priorFlags: s.priorFlags.slice(), canFinish: false };
+        if (finish) { finish.remove(); finish = null; }
+      }
+      function blocked(e, kind) {
+        e.preventDefault(); s.tel[kind === 'drop' ? 'dropAttempts' : 'pasteAttempts']++; update();
+        warning.textContent = 'Paste and drop are off. Retype your answer to finish. These flags are not proof of AI use.'; save();
+      }
       ta.addEventListener('paste', function (e) { blocked(e, 'paste'); }); ta.addEventListener('drop', function (e) { blocked(e, 'drop'); });
       ta.addEventListener('dragover', function (e) { e.preventDefault(); });
-      ta.addEventListener('beforeinput', function (e) { if (/^insertFrom(Paste|Drop)/.test(e.inputType || '')) blocked(e, /Drop/.test(e.inputType) ? 'drop' : 'paste'); });
-      ta.addEventListener('keydown', function (e) { if (e.key.length === 1 || ['Enter', 'Backspace', 'Delete'].includes(e.key)) { s.tel.keystrokes++; if (['Backspace', 'Delete'].includes(e.key)) s.tel.deletes++; } });
-      ta.addEventListener('input', function () { s.tel.inputEvents++; s.essay = ta.value; update(); save(); });
-      ta.addEventListener('focus', function () { focusSince = performance.now(); }); ta.addEventListener('blur', function () { finishFocus(); save(); }); update();
+      ta.addEventListener('beforeinput', function (e) {
+        if (/^insertFrom(Paste|Drop)/.test(e.inputType || '')) { blocked(e, /Drop/.test(e.inputType) ? 'drop' : 'paste'); return; }
+        // Native on-screen keyboards may send no printable keydown. Credit one trusted character, never a synthetic bulk insertion.
+        if (!pending && e.isTrusted && e.inputType === 'insertText' && e.data && e.data.length === 1) pending = 1;
+      });
+      ta.addEventListener('keydown', function (e) {
+        pending = !e.ctrlKey && !e.metaKey && e.key.length === 1 ? 1 : e.key === 'Enter' ? 1 : 0;
+        if (pending || ['Backspace', 'Delete'].includes(e.key)) { s.tel.keystrokes++; if (['Backspace', 'Delete'].includes(e.key)) s.tel.deletes++; }
+      });
+      ta.addEventListener('keyup', function () { pending = 0; });
+      ta.addEventListener('input', function () {
+        var old = s.essay, text = ta.value, a = 0, z = 0, now = performance.now();
+        while (a < old.length && a < text.length && old[a] === text[a]) a++;
+        while (z < old.length - a && z < text.length - a && old[old.length - 1 - z] === text[text.length - 1 - z]) z++;
+        var inserted = text.length - a - z;
+        s.tel.typedChars = Math.max(0, s.tel.typedChars - (old.length - a - z)) + Math.min(pending, inserted); s.tel.unkeyedChars += Math.max(0, inserted - pending); pending = 0;
+        if (lastInput !== null) s.tel.typingMs += Math.min(now - lastInput, 2000);
+        lastInput = now;
+        if (burstStart === null || now - burstStart > E.telemetry.burstMs) { burstStart = now; burstChars = 0; }
+        burstChars += inserted;
+        if (burstChars >= E.telemetry.burstWords * 5) s.tel.burst++;
+        s.tel.inputEvents++; s.essay = text;
+        if (authorship(s).flags.includes('typing speed')) s.tel.speedFlag = 1;
+        update(); save();
+      });
+      ta.addEventListener('focus', function () { focusSince = performance.now(); });
+      ta.addEventListener('blur', function () { pending = 0; finishFocus(); save(); }); update();
       b('Check my answer', function () {
         finishFocus(); if (document.activeElement === ta) focusSince = performance.now();
-        var r = C.essay(s.essay, s.inspected, s.hypothesis); result.replaceChildren();
+        var r = C.essay(s.essay, s.inspected, s.hypothesis), review = authorship(s); result.replaceChildren();
+        if (finish) { finish.remove(); finish = null; }
+        s.result = { content: r, authorship: review, priorFlags: s.priorFlags.slice(), canFinish: r.passed && !review.flags.length };
         env.paragraph(result, r.passed ? 'Content criteria met. Authorship still needs teacher review; this does not settle the first shot.' : 'Revise your answer using your inspected sources.');
         env.paragraph(result, 'Evidence ' + r.criteria.evidence.count + '/' + E.minRefs + '; other account ' + (r.criteria.otherSide.pass ? 'addressed' : 'needs weighing') + '; words ' + r.words + '/' + E.minWords + '.');
         r.hints.forEach(function (h) { env.paragraph(result, h); });
-        var ratio = s.essay.length ? s.tel.keystrokes / s.essay.length : 1;
-        env.paragraph(result, 'Local review flags: paste/drop attempts ' + (s.tel.pasteAttempts + s.tel.dropAttempts) + '; low keystroke ratio ' + (s.essay.length >= E.telemetry.minCharsForRatio && ratio < E.telemetry.lowRatio ? 'yes' : 'no') + '. Accessibility input can affect these flags.');
-        if (r.passed) result.appendChild(env.button('Finish this investigation', function () { env.go('finished'); }, 'finish-investigation', true)); save();
+        env.paragraph(result, 'Local review flags: ' + (review.flags.join(', ') || 'none') + '; typing rate ' + review.wordsPerMinute + ' words/minute. Accessibility input can affect these flags.');
+        if (review.flags.length) env.paragraph(result, 'Finish is blocked. Use Retype to start a fresh answer. If your input method keeps getting flagged, keep this draft and ask your teacher to review it outside the game. Your saved flags include earlier drafts; local Finish remains blocked.');
+        if (s.result.canFinish) finish = b('Finish this investigation', function () {
+          if (C.essay(s.essay, s.inspected, s.hypothesis).passed && !authorship(s).flags.length) env.go('finished');
+        }, 'finish-investigation', true); save();
       }, 'check-essay', true);
+      b('Retype a fresh answer', function () {
+        finishFocus();
+        var review = authorship(s);
+        if (review.flags.length) s.priorFlags.push(review);
+        s.essay = ''; s.tel = telemetry(); s.result = null; save(); render();
+      }, 'retype-essay');
       b('Revisit one document', function () { finishFocus(); env.go('study'); }, 'essay-documents');
       b('Revise my hypothesis', function () { finishFocus(); env.go('hypothesis'); }, 'essay-hypothesis');
       b('My scene notebook', env.notebook, 'essay-notebook');
@@ -159,8 +227,10 @@
       if (p() === 'hypothesis') { hypothesis(); return; }
       if (p() === 'essay') { essay(); return; }
       if (p() === 'finished') {
-        env.showCard('Investigation complete', 'Your answer meets the local content criteria. The sources still leave the first shot unresolved. [PIVOT]');
-        add('Your draft, notes, inspected sources, and last hypothesis are saved locally. Teacher review of reasoning and authorship remains outside this game.');
+        showCard('Investigation complete', 'Your answer meets the local content criteria. The sources still leave the first shot unresolved. [PIVOT]');
+        add('Your draft, notes, inspected sources, hypothesis, and authorship review flags are saved locally.');
+        add('Current authorship flags: ' + (authorship(g()).flags.join(', ') || 'none') + '. Earlier flagged drafts: ' + g().priorFlags.length + '.');
+        g().priorFlags.forEach(function (review, i) { add('Earlier draft ' + (i + 1) + ': ' + review.flags.join(', ') + '; typing rate ' + review.wordsPerMinute + ' words/minute.'); });
         b('Read or revise my answer', function () { env.go('essay'); }, 'revise-essay', true); b('Read the notebook', env.notebook, 'end-notebook');
         b('Restart this run', env.restart, 'restart'); return;
       }
@@ -186,19 +256,19 @@
       }
     }
     function shelterCard() {
-        env.showCard('Shelter reached', 'Eli did not see a first shooter. Your observations are invented gameplay, not Revere’s testimony. [PIVOT]');
+        showCard('Shelter reached', 'Eli did not see a first shooter. Your observations are invented gameplay, not Revere’s testimony. [PIVOT]');
         add('Aftermath, document paraphrase: 8 colonists killed, 10 wounded; 1 British soldier wounded. [OUTCOME]');
         b('Leave 1775 for the evidence room', function () { env.go('study'); }, 'enter-study', true); b('Read my scene notes', env.notebook, 'shelter-notebook'); env.panel.hidden = true;
     }
     function frame(dt, now, active, keys, yaw) {
       if (!scene) scene = env.W.makeGreen(env.lex, G.stops);
       scene.group.visible = true;
-      var s = g(), dx = 0, dz = 0;
+      var s = g(), dx = 0, dz = 0, moveDt = Math.min(dt, 0.05);
       if (['green', 'shelter'].includes(p()) && active && !s.sheltered) {
         var target = env.target();
         if (target) { dx = target.x - s.x; dz = target.z - s.z; if (Math.hypot(dx, dz) < 0.12) { s.x = target.x; s.z = target.z; env.setTarget(null); dx = dz = 0; save(); } }
         else { var f = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0), r = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0); dx = -Math.sin(yaw) * f + Math.cos(yaw) * r; dz = -Math.cos(yaw) * f - Math.sin(yaw) * r; }
-        var len = Math.hypot(dx, dz), step = target ? Math.min(dt * 4, len) : dt * 4;
+        var len = Math.hypot(dx, dz), step = target ? Math.min(moveDt * 4, len) : moveDt * 4;
         if (len) { s.x = Math.max(0, Math.min(19, s.x + dx / len * step)); s.z = Math.max(-20, Math.min(-13, s.z + dz / len * step)); }
       }
       scene.pose(s.x, s.z, dx, dz, now / 1000, p(), env.elapsed(), s.spot, yaw);
@@ -212,5 +282,5 @@
     function hide() { if (scene) scene.group.visible = false; }
     return { render: render, frame: frame, interact: interact, hide: hide, finishFocus: finishFocus, reset: function () { draft = null; focusSince = null; } };
   }
-  window.WL_SLICE = { phases: phases, modern: modern, fresh: fresh, valid: valid, create: create };
+  window.WL_SLICE = { phases: phases, modern: modern, fresh: fresh, valid: valid, migrate: migrate, authorship: authorship, create: create };
 })();

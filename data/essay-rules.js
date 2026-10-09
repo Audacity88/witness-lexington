@@ -1,18 +1,22 @@
 /* Witness the First Shot — ESSAY CHECK RULES (local only: no AI, no network).
    Question: "Which side do you believe fired first, and why?"
 
-   PASS = all three:
+   PASS = evidence, counteraccount, length, and sentence structure:
      (a) evidence: at least `minRefs` DIFFERENT evidence references. A reference = one rule below whose pattern matches.
          Rules that point at the same card count once per card ("group"). A reference to the kid's OWN reenactment
          (see `own`) counts as one extra reference and is reported as a STRONG reference (bonus).
      (b) other side: the essay mentions the account it does NOT side with (see `accounts`) AND uses a weighing word
          (why it is weaker, or why it is still possible). If the stance can't be detected, both accounts must be mentioned.
      (c) length: at least `minWords` words.
+     (d) distinct claim sentences with connected reasoning; repeated or keyword-only lists fail.
    All patterns are case-insensitive JavaScript regex source strings, tested against the lowercased essay. */
 window.WG_ESSAY = {
   question: 'Which side do you believe fired first, and why?',
   minWords: 60,
   minRefs: 2,
+  structure: { minSentences: 3, minSentenceWords: 5, maxRepeatedFraction: 0.25, nearDuplicate: 0.75,
+    claim: "\\b(is|are|was|were|saw|heard|fired|ordered|said|says|say|describes?|claims?|reported|stood|blocked|had|shows?|appeared|think|believe|cannot|could|might|would|disagree|gives?|came|comes?|fits?|picked|chose)\\b",
+    connective: "\\b(because|but|however|although|though|while|so|therefore|since|yet)\\b" },
 
   // (a) evidence references: distinctive details from each card
   refs: [
@@ -26,7 +30,7 @@ window.WG_ESSAY = {
     { id: 'doolittle-art',  group: 'doolittle',  label: "Doolittle's engraving is an artist's picture", any: ["doolittle", "engraving", "\\bartist", "\\bpicture\\b", "\\bdrawing\\b"] },
     { id: 'outcome',        group: 'outcome',    label: '8 colonists killed and 10 wounded vs 1 British soldier wounded', any: ["\\b8\\b[^.]{0,25}(killed|dead|died|colonist)", "\\beight\\b[^.]{0,25}(killed|dead|died|colonist)", "\\b(10|ten)\\b[^.]{0,15}wounded", "(only )?(1|one)[^.]{0,20}(british|redcoat|regular|soldier)[^.]{0,20}(wounded|hurt)"] },
     { id: 'numbers',        group: 'numbers',    label: 'About 400 regulars vs about 80 militia', any: ["\\b400\\b", "four hundred", "\\b80\\b", "eighty", "outnumbered"] },
-    { id: 'formation',      group: 'formation',  label: 'The militia stood in plain sight, in parade formation', any: ["plain sight", "\\bparade\\b", "formation", "two ranks", "lined up"] },
+    { id: 'formation',      group: 'formation',  label: 'The militia stood in plain sight, in parade formation', any: ["plain sight", "\\bparade\\b", "formation", "lined up"] },
     { id: 'control',        group: 'control',    label: "The charge got beyond the officers' control", any: ["(out of|beyond)[^.]{0,25}control", "lost control", "(couldn'?t|could not) (stop|control)"] }
   ],
 
@@ -55,10 +59,11 @@ window.WG_ESSAY = {
     colors:   { red: "\\b(red|contradict\\w*|didn'?t fit|did not fit)\\b", green: "\\b(green|fit|fits|fitted|matched|agreed)\\b", grey: "\\b(grey|gray|silent)\\b" }
   },
 
-  // telemetry thresholds (flags only; nothing is auto-disqualified in v1)
-  telemetry: { lowRatio: 0.6, minCharsForRatio: 80 },
+  // Local input flags require a fresh typed draft; they do not prove AI authorship.
+  telemetry: { lowRatio: 0.6, minCharsForRatio: 80, maxWPM: 300, minWordsForSpeed: 20, burstWords: 12, burstMs: 1000 },
 
   hints: {
+    structure: 'Write at least three distinct claim sentences of five or more words each and connect evidence to your conclusion. Remove repeated or near-duplicate sentences and keyword lists.',
     length: 'Write a bit more: aim for at least {min} words (you have {n}).',
     refs0: 'Use the evidence! Mention at least 2 details from the cards, like the house that blocked Revere\u2019s view, the "Pistol", or 8 killed vs 1 wounded.',
     refs1: 'Good start with {got}. Add one more piece of evidence from a different card.',
@@ -79,4 +84,12 @@ window.WG_ESSAY = {
   var ref = window.WG_ESSAY.refs.find(function (r) { return r.id === 'depositions'; });
   ref.any = ref.any.concat(patterns);
   window.WG_ESSAY.accounts.militia.any = window.WG_ESSAY.accounts.militia.any.concat(patterns);
+})();
+
+(function () {
+  window.WG_ESSAY.refs.forEach(function (r) {
+    if (r.group === 'revere1775') r.attribution = "\\brevere(?:'s)?\\b[^.!?]{0,40}\\b(saw|heard|could not see|couldn't see|view|reported|wrote|said|says|deposition)\\b|\\b(blocked|covered|hid)[^.!?]{0,20}\\brevere(?:'s)?\\b|1775 deposition[^.!?]{0,40}\\b(says|reports|describes)\\b";
+    if (r.group === 'revere1798') r.attribution = "\\brevere(?:'s)?\\b[^.!?]{0,50}\\b(saw|heard|described|wrote|said|says|reported|letter|account)\\b|\\b(1798|belknap)\\b[^.!?]{0,40}\\b(letter|account|says|reports|describes)\\b";
+    if (r.attribution) r.exclude = "\\b(eli|my (view|game|scene)|i (saw|heard|stood|met)|fictional (scene|view|observation))\\b";
+  });
 })();

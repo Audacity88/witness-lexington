@@ -48,7 +48,7 @@ window.WG_DATA = {
       quotes: ['…one gun was fired, I heard the report, turned my head…'] },
     { id: 'revere1798', kind: 'testimony', title: 'Paul Revere — letter to Belknap', date: '1798',
       flag: 'Later account by the same witness, not independent. The chosen MASSAR transcript marks this paragraph as struck through.',
-      quotes: ['…I saw, & heard, a Gun fired, which appeared to be a Pistol. Then I could distinguish two Guns, & then a Continual roar of Musquetry.'] },
+      quotes: ['…I saw, & heard, a Gun fired, which appeared to be a Pistol. Then I could distinguish two Guns, & then a Continual roar of Musquetry;…'] },
     { id: 'barker', kind: 'testimony', title: "Lt. John Barker's diary (British)", date: '',
       flag: 'Paraphrase of the NPS published diary excerpt. This is Barker\'s claim.',
       summary: 'Barker claims the militia fired one or two shots first.' },
@@ -127,9 +127,9 @@ window.WG_DATA = {
     },
     formation: {
       shooter: {
-        regular:    ['G', 'The militia stand in two ranks in plain sight.'],
-        officer:    ['G', 'The militia stand in two ranks in plain sight.'],
-        militiaman: ['G', 'The militia stand in two ranks in plain sight.'],
+        regular:    ['G', 'The militia stand in parade formation in plain sight.'],
+        officer:    ['G', 'The militia stand in parade formation in plain sight.'],
+        militiaman: ['G', 'The militia stand in parade formation in plain sight.'],
         hidden:     ['G', 'The militia stand in plain sight; your shooter is someone else, hidden.']
       }
     },
@@ -163,7 +163,7 @@ window.WG_DATA = {
       quotes: ['…one gun was fired, I heard the report, turned my head…'],
       scan: 'Scan of the original deposition: not available yet (placeholder)' },
     revere1798: { title: 'Paul Revere \u2014 letter to Belknap, 1798', badge: 'transcription (excerpt)', source: 'Massachusetts Historical Society, item 99',
-      quotes: ['…I saw, & heard, a Gun fired, which appeared to be a Pistol. Then I could distinguish two Guns, & then a Continual roar of Musquetry.'],
+      quotes: ['…I saw, & heard, a Gun fired, which appeared to be a Pistol. Then I could distinguish two Guns, & then a Continual roar of Musquetry;…'],
       flag: 'Later account by the same witness, not independent. MASSAR marks this paragraph as struck through.', scan: 'Scan of the original letter: not available yet (placeholder)' },
     barker: { title: 'Lt. John Barker\u2019s diary (British)', badge: 'paraphrase \u00b7 NPS diary excerpt', text: 'Paraphrase: Barker claims the militia fired one or two shots first.',
       flag: 'A British account, not a settled verdict.', scan: 'Diary page: not available yet (placeholder)' },

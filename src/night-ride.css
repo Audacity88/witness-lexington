@@ -7,7 +7,7 @@
 .wl button:disabled { opacity:.55; cursor:default; }
 .wl button:focus-visible, .wl a:focus-visible { outline:3px solid #ffda8d; outline-offset:3px; }
 .wl button.primary { background:#ffda8d; border-color:#ffda8d; color:#172338; font-weight:700; }
-.wl a { color:#ffda8d; }
+.wl a { color:#ffda8d; display:inline-flex; align-items:center; min-height:44px; min-width:44px; padding:8px 0; }
 .wl h1 { font-size:clamp(22px,4vw,32px); margin:0 0 8px; }
 .wl h2 { font-size:22px; margin:0 0 10px; }
 .wl p { margin:6px 0 12px; }
@@ -17,7 +17,7 @@
 .wl .top > * { pointer-events:auto; }
 .wl .brand { padding:8px 12px; border-radius:8px; background:#142237ee; }
 .wl .brand b, .wl .brand small { display:block; }
-.wl .panel { position:absolute; z-index:2; bottom:12px; left:12px; right:12px; background:#142237f2; padding:12px 16px; border:1px solid #738392; border-radius:12px; max-height:48%; overflow:auto; }
+.wl .panel { position:absolute; z-index:2; bottom:12px; left:12px; right:12px; background:#142237f2; padding:12px 16px; border:1px solid #738392; border-radius:12px; max-height:48%; display:flex; flex-direction:column; gap:6px; overflow:hidden; }
 .wl .panel p { margin:0 0 6px; }
 .wl .overlay { position:absolute; inset:0; z-index:3; display:grid; place-items:center; background:#0b1427a8; padding:12px; }
 .wl .overlay.black { background:#000; }
@@ -49,3 +49,20 @@
 .wl blockquote { margin:12px 0; border-left:3px solid #ffda8d; padding:8px 12px; }
 .wl #hypothesis-result, .wl #essay-result { margin:12px 0; }
 .wl .card > button { margin:6px 8px 2px 0; }
+
+/* Primary scene actions stay above the scrolling travel choices. */
+.wl .panel > p { flex:none; }
+.wl .panel > .row:not(.route) { order:1; flex:none; }
+.wl .panel > .route { order:2; min-height:0; overflow:auto; flex-shrink:1; }
+.wl .panel > .notice { order:3; flex:none; margin:0; }
+/* Study content scrolls independently of the action footer. */
+.wl .card.study-card { display:flex; flex-direction:column; overflow:hidden; padding:0; }
+.wl .card-scroll { min-height:0; overflow:auto; padding:18px 22px; }
+.wl .card-actions { flex:none; display:flex; flex-wrap:wrap; gap:6px; padding:10px 14px; border-top:1px solid #738392; background:#142237; }
+.wl .card-actions button { flex:1 1 44%; }
+@media (max-height:450px) {
+  .wl .card.study-card { padding:0; }
+  .wl .card-scroll { padding:12px 18px; }
+  .wl .card-actions { padding:6px 10px; }
+  .wl .panel > p { max-height:3.8em; overflow:auto; }
+}

@@ -74,9 +74,9 @@ A version is **NOT ACCEPTED** if any *hard fact* card is red. Testimony cards ma
 
 | shooter | mark | why |
 |---|---|---|
-| A regular (`regular`) | G | The militia stand in two ranks in plain sight. |
-| An officer's pistol (`officer`) | G | The militia stand in two ranks in plain sight. |
-| A militiaman (`militiaman`) | G | The militia stand in two ranks in plain sight. |
+| A regular (`regular`) | G | The militia stand in parade formation in plain sight. |
+| An officer's pistol (`officer`) | G | The militia stand in parade formation in plain sight. |
+| A militiaman (`militiaman`) | G | The militia stand in parade formation in plain sight. |
 | Someone hidden (`hidden`) | G | The militia stand in plain sight; your shooter is someone else, hidden. |
 
 ## Outcome — HARD FACT

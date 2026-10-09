@@ -50,6 +50,10 @@
       // Upgrade the WL-S1 checkpoint in place, keeping its alarm and notebook.
       if (s && s.version === 1 && s.run && !s.run.dawn && ['rewind', 'ride', 'complete'].includes(s.run.phase)) s.run.dawn = freshDawn();
       if (s && s.version === 1 && s.run && !s.run.green) s.run.green = window.WL_SLICE.fresh();
+      if (s && s.run && s.run.green) {
+        window.WL_SLICE.migrate(s.run.green);
+        if (s.run.phase === 'finished' && window.WL_SLICE.authorship(s.run.green).flags.length) s.run.phase = 'essay';
+      }
       return s && s.version === 1 && valid(s.run) ? s.run : null;
     }
     catch (e) { storageOK = false; return null; }
@@ -119,7 +123,7 @@
     dialog.appendChild(el('h3', '', 'Historical context and citations'));
     D.sources.concat([B.source]).forEach(function (s) {
       var a = el('article'); paragraph(a, s.id + ' ' + s.label); paragraph(a, s.note);
-      var link = el('a', '', 'Passage and source reference'); link.href = 'SOURCES.md#' + s.anchor;
+      var link = el('a', '', 'Passage and source reference'); link.href = window.WL_SOURCES_URL || 'SOURCES.md#' + s.anchor;
       link.target = '_blank'; link.rel = 'noopener'; a.appendChild(link); dialog.appendChild(a);
     });
     dialog.appendChild(el('h3', '', 'Green observations · fictional gameplay'));
@@ -139,6 +143,7 @@
     card.replaceChildren(); if (tag) paragraph(card, tag, 'tag'); card.appendChild(el('h1', '', title)); paragraph(card, text);
     studyNotice.textContent = notice.textContent; if (later()) card.appendChild(studyNotice);
     overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-label', title);
+    card.classList.toggle('study-card', later() && modern() && !paused);
     overlay.hidden = false; overlay.classList.toggle('black', state.phase === 'blackout');
   }
   function go(phase) {
@@ -371,7 +376,7 @@
   });
   new ResizeObserver(resize).observe(host); resize(); render();
   function frame(now) {
-    var dt = Math.min(0.05, (now - last) / 1000); last = now;
+    var dt = Math.max(0, (now - last) / 1000), moveDt = Math.min(0.05, dt); last = now;
     var opening = ['intro', 'opening', 'blackout'].includes(state.phase);
     if (state.phase === 'opening' && !paused && !dialog.open) {
       elapsed += dt; caption(); if (elapsed >= 22) go('blackout');
@@ -399,7 +404,7 @@
           var r = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
           mx = -Math.sin(yaw) * f + Math.cos(yaw) * r; mz = -Math.cos(yaw) * f - Math.sin(yaw) * r;
         }
-        var len = Math.hypot(mx, mz), step = target ? Math.min(dt * 4, len) : dt * 4;
+        var len = Math.hypot(mx, mz), step = target ? Math.min(moveDt * 4, len) : moveDt * 4;
         if (len) { d.x = Math.max(-13, Math.min(13, d.x + mx / len * step)); d.z = Math.max(-16, Math.min(-8, d.z + mz / len * step)); }
       }
       dawn.pose(d.x, d.z, mx, mz, now / 1000);
@@ -424,7 +429,7 @@
         }
         var length = Math.hypot(dx, dz);
         if (length) {
-          var step = target ? Math.min(dt * 7, length) : dt * 7;
+          var step = target ? Math.min(moveDt * 7, length) : moveDt * 7;
           state.x = Math.max(-1.6, Math.min(1.6, state.x + dx / length * step));
           state.z = Math.max(0, Math.min(46, state.z + dz / length * step));
           night.horse.rotation.y = Math.atan2(-dx, -dz);

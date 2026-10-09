@@ -634,7 +634,7 @@
           if (lex.horse.visible) lex.horse.position.z = lerp(22, 6.6, ease(clamp01((t - 3) / 3)));
           lex.hidden.visible = false; lex.ring.visible = false;
           Object.keys(lex.markers).forEach(function (k) { lex.markers[k].visible = false; });
-          lex.fx.clear(); walkers.pose(x, z, dx, dz, time);
+          lex.fx.clear(); lex.militia.forEach(function (m) { m.visible = true; }); walkers.pose(x, z, dx, dz, time);
           walkers.rings.forEach(function (r, i) { r.visible = phase === 'shelter' ? stops[i].id === 'shelter' : phase === 'green'; });
           // Hide destination labels during observation so they cannot float through the obstruction.
           walkers.group.children.forEach(function (c) { if (c.isSprite) c.visible = ['green', 'shelter'].includes(phase); });
@@ -650,8 +650,9 @@
               lex.militia.forEach(function (m, i) { m.position.x += k * (i % 2 ? 6 : -6); m.position.z -= k * 8; walkLegs(m, time, 10); });
               lex.regs.forEach(function (r) { if (r.userData.adv) { r.position.z -= k * 4; walkLegs(r, time, 10); } });
               // Diffuse aftermath smoke has no first-shot muzzle, flash, direction, or identity.
-              lex.fx.puff(new T.Vector3(0, 1.5, 2), 5); lex.fx.update(1.5);
+              // No localized cloud that could suggest which line fired first.
             }
+            lex.militia.forEach(function (m) { m.visible = m.position.distanceTo(cam.position) >= 2.5; });
           } else {
             walkers.eli.visible = !['study', 'hypothesis', 'essay', 'finished'].includes(phase);
             cam.position.set(x + Math.sin(yaw) * 10, 8, z + Math.cos(yaw) * 10); cam.lookAt(x, 1, z + 3);
