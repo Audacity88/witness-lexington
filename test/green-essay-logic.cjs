@@ -215,6 +215,33 @@ check('Revere deposition and Barker are two source groups',()=>{
  const text=endings[0].replace('Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first.', "Revere's 1775 deposition says a house blocked his view of the militia, but Barker says the militia fired one or two shots first.");
  const r=C.essay(text,D.cards.map(c=>c.id),null);assert(r.passed);assert.equal(r.refs.length,2);assert.equal(r.criteria.structure.denseSentences,0);
 });
+check('Revere letter vocabulary does not invent a third source',()=>{
+ const comparison="Revere’s 1798 letter says an officer appeared to fire a pistol in front of the troops, but Barker says the militia fired first.";
+ const essay=endings[0].replace('Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first.',comparison);
+ for(const inspected of [D.cards.map(c=>c.id),['revere1798','barker']]){
+   const r=C.essay(essay,inspected,null);assert(r.passed);assert.equal(r.criteria.structure.denseSentences,0);
+   assert.equal(r.refs.length,2);assert(r.refs.some(r=>r.card==='revere1798'));assert(!r.refs.some(r=>r.card==='revere1775'));
+ }
+ assert.equal(C.essay(comparison,['revere1775'],null).refs.length,0);
+ const parkerComparison=comparison.replace('Barker says the militia fired first', "Parker's 1775 deposition says the regulars fired first");
+ const p=C.essay(parkerComparison,D.cards.map(c=>c.id),null);assert.equal(p.refs.length,2);assert(p.refs.some(r=>r.card==='revere1798'));assert(p.refs.some(r=>r.card==='depositions'));assert.equal(p.criteria.structure.denseSentences,0);
+ // Either explicit Revere document retains its own shared vocabulary; explicitly naming both counts both.
+ const earlier="Revere's 1775 deposition says he saw smoke in front of the troops.";
+ assert(C.essay(earlier,['revere1775'],null).refs.some(r=>r.card==='revere1775'));
+ const both=earlier.replace('.', ", while Revere's 1798 letter says he saw a pistol.");
+ const r=C.essay(both,['revere1775','revere1798'],null);assert.equal(r.refs.length,2);assert.equal(r.criteria.structure.denseSentences,0);
+ const reverse="In his 1775 deposition, Revere said a house blocked his view, while Revere's 1798 letter says he saw a pistol.";
+ const essayReverse=endings[0].replace('Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first.',reverse).replace('His diary', 'However, his diary');
+ const reversed=C.essay(essayReverse,['revere1775','revere1798'],null);assert(reversed.passed);assert.equal(reversed.refs.length,2);assert.equal(reversed.criteria.structure.denseSentences,0);
+});
+check('Doolittle source limitations preserve evidence and inspection filtering',()=>{
+ const claims=['Doolittle was only an artist, not an eyewitness to the first shot.', 'Doolittle was an artist, so his picture cannot prove who fired first.', 'Only an artist, Doolittle was not an eyewitness to the first shot.', 'Doolittle was not an eyewitness to the first shot.'];
+ for(const claim of claims){
+   const essay=endings[0].replace('Revere saw smoke in front of the troops but a house blocked his view of the militia.',claim).replace('smoke alone','the picture alone').replace('His diary', 'However, his diary');
+   const r=C.essay(essay,['doolittle','barker'],null);assert(r.passed);assert.equal(r.refs.length,2);assert(r.refs.some(r=>r.card==='doolittle'));
+   assert.equal(C.essay(essay,['barker'],null).refs.length,1);
+ }
+});
 check('Parker reference is still filtered by inspection',()=>{const r=C.essay(parkerEssay,['barker'],null);assert(!r.passed);assert.equal(r.refs.length,1);});
 check('Parker detail works in either order and identifies counteraccount',()=>{
  for(const text of ['Parker ordered dispersal and no firing.', 'An unprovoked attack without provocation is what Parker reported.', 'The militia were ordered to disperse and not to fire, according to Parker.'])assert(C.essay(text,['depositions'],null).refs.some(r=>r.card==='depositions'));

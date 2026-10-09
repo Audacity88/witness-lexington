@@ -5289,13 +5289,18 @@ window.WG_ESSAY = {
     revere1798: "\\b(saw|heard|appeared|described)\\b[^.!?]{0,60}\\bpistol\\b|\\bpistol\\b[^.!?]{0,40}\\b(appeared|fired)\\b|\\b(later|1798|belknap|same witness|two guns|roar|musquetry)\\b",
     barker: "\\b(barker|diary)\\b[^.!?]{0,140}\\b(one or two shots|(?:militia|colonists|minutemen) (?:fired|shot))\\b|\\b(one or two shots|(?:militia|colonists|minutemen) (?:fired|shot))\\b[^.!?]{0,140}\\b(barker|diary)\\b",
     depositions: "\\b(parker|depositions?|sworn|testimony)\\b[^.!?]{0,140}\\b(fired|shot|disperse(?:d)?|dispersal|not (?:to )?fire|no[ -]fir(?:e|ing)|unprovoked|without (?:any )?provocation)\\b|\\b(fired|shot|disperse(?:d)?|dispersal|not (?:to )?fire|no[ -]fir(?:e|ing)|unprovoked|without (?:any )?provocation)\\b[^.!?]{0,140}\\b(parker|depositions?|sworn|testimony)\\b",
-    doolittle: "\\b(artist|engraving|picture|drawing)\\b[^.!?]{0,60}\\b(artist|pictured|depicts?|shows?|portrays?|proof)\\b|\\bdoolittle(?:'s)?\\b[^.!?]{0,60}\\b(pictured|depicts?|shows?|portrays?)\\b",
+    doolittle: "\\b(artist|engraving|picture|drawing)\\b[^.!?]{0,60}\\b(artist|pictured|depicts?|shows?|portrays?|proof)\\b|\\bdoolittle(?:'s)?\\b[^.!?]{0,60}\\b(pictured|depicts?|shows?|portrays?)\\b|\\bdoolittle(?:'s)?\\b[^.!?]{0,60}\\bartist\\b|\\bartist\\b[^.!?]{0,60}\\bdoolittle(?:'s)?\\b|\\bdoolittle(?:'s)?\\b[^.!?]{0,60}\\b(not (?:an? )?eyewitness|not a witness|(?:did not|didn't|never) witness(?:ed)?)\\b",
     numbers: "\\b(400|four hundred|80|eighty)\\b[^.!?]{0,30}\\b(regulars?|british|militia|colonists|soldiers?)\\b|\\b(regulars?|british|militia|colonists|soldiers?)\\b[^.!?]{0,30}\\b(400|four hundred|80|eighty|outnumbered)\\b",
     formation: "\\bmilitia\\b[^.!?]{0,60}\\b(plain sight|parade|formation|lined up)\\b|\\b(plain sight|parade|formation|lined up)\\b[^.!?]{0,60}\\bmilitia\\b",
     control: "\\b(charge|officers?|regulars?|british|soldiers?|men)\\b[^.!?]{0,60}\\b((out of|beyond)[^.!?]{0,25}control|lost control|(?:couldn't|could not) (?:stop|control))\\b"
   };
+  var revere1775 = "\\brevere(?:'s)?(?: 1775)? deposition\\b|\\brevere(?:'s)? 1775\\b|\\b1775 deposition,? (?:by )?(?:paul )?revere\\b";
+  var revere1798 = "\\b(1798|belknap)\\b|\\brevere(?:'s)?(?: later)? letter\\b|\\blater (letter|account)\\b";
   window.WG_ESSAY.refs.forEach(function (r) {
     if (details[r.group]) r.detailClaim = details[r.group];
+    // Shared smoke/front vocabulary does not turn an explicitly named letter into a deposition.
+    if (r.group === 'revere1775') { r.source = revere1775; r.otherSource = revere1798; }
+    if (r.group === 'revere1798') { r.source = revere1798; r.otherSource = revere1775; }
     if (r.group === 'depositions') {
       // Revere's singular deposition is not Parker's source, even when Barker shares the sentence.
       r.otherSource = "\\brevere(?:'s)?\\b|\\b1775 deposition\\b";
