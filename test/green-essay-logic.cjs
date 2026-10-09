@@ -73,7 +73,28 @@ for(const spot of ['corner','edge']) {
  type(g,'essay-text','I believe the regulars fired first.');g.click('check-essay');check('Short unsupported answer fails '+spot,()=>assert(!g.doc.getElementById('finish-investigation')));
  check('Paste, drop, beforeinput blocked '+spot,()=>{const n=g.doc.getElementById('essay-text');for(const kind of ['paste','drop']){let stopped=false;n.dispatch(kind,{preventDefault(){stopped=true;}});assert(stopped);}let stopped=false;n.dispatch('beforeinput',{inputType:'insertFromPaste',preventDefault(){stopped=true;}});assert(stopped);assert.equal(g.snap().run.green.tel.pasteAttempts,2);assert.equal(g.snap().run.green.tel.dropAttempts,1);});
  check('Page exit flushes focused time '+spot,()=>{const ta=g.doc.getElementById('essay-text');ta.focus();g.frames(20);g.events.pagehide.forEach(fn=>fn());assert(JSON.parse(g.storage[KEY]).run.green.tel.msFocused>=1000);});
- const draft=g.snap().run.green.essay;g.click('essay-documents');select(g,'document','revere1798');g.click('return-essay');
+ const draft=g.snap().run.green.essay;g.click('essay-documents');
+ check('Cleared limitation disables and guards essay return '+spot,()=>{
+   const note=g.doc.getElementById('limitation');note.value='';note.dispatch('input');
+   const back=g.doc.getElementById('return-essay');assert(back.disabled);
+   back.disabled=false;back.dispatch('click');assert.equal(g.snap().run.phase,'study');
+   assert(g.ctx.WL_SLICE.valid(g.snap().run.green,'study'));
+ });
+ check('Incomplete ranking reload retains draft and prior progress '+spot,()=>{
+   g=reload(g);assert.equal(g.snap().run.phase,'study');assert(g.doc.getElementById('return-essay').disabled);
+   assert.equal(g.snap().run.green.essay,draft);assert.equal(g.snap().run.visited.length,2);assert(g.snap().run.dawn.boundary);
+ });
+ check('Short limitation also blocks essay return '+spot,()=>{type(g,'limitation','Too short');assert(g.doc.getElementById('return-essay').disabled);});
+ const note=g.doc.getElementById('limitation');note.value='';note.dispatch('input');type(g,'limitation','The diary gives only one observer’s view.');
+ check('Duplicate or cleared source selection blocks essay return '+spot,()=>{
+   select(g,'rank-1','barker');assert(g.doc.getElementById('return-essay').disabled);
+   select(g,'rank-1','');assert(g.doc.getElementById('return-essay').disabled);
+   g=reload(g);assert.equal(g.snap().run.phase,'study');assert.equal(g.snap().run.green.essay,draft);
+ });
+ check('Repairing ranking re-enables valid essay resume '+spot,()=>{
+   select(g,'rank-0','barker');select(g,'rank-1','revere1775');assert(!g.doc.getElementById('return-essay').disabled);
+   select(g,'document','revere1798');g.click('return-essay');assert(g.ctx.WL_SLICE.valid(g.snap().run.green,'essay'));
+ });
  check('Document visit and typing shortcuts preserve draft '+spot,()=>{assert.equal(g.doc.getElementById('essay-text').value,draft);assert.equal(g.snap().run.phase,'essay');});
  g=reload(g);check('Essay refresh retains draft and counters '+spot,()=>{assert.equal(g.doc.getElementById('essay-text').value,draft);assert(g.snap().run.green.tel.keystrokes>0);assert.equal(g.snap().run.green.tel.dropAttempts,1);});
  const n=g.doc.getElementById('essay-text');n.value='';n.dispatch('input');type(g,'essay-text',endings[spot==='corner'?0:2]);g.click('check-essay');g.click('finish-investigation');
@@ -83,6 +104,17 @@ for(const spot of ['corner','edge']) {
 const g=boot(),C=g.ctx.WL_CHECK,D=g.ctx.WG_DATA;
 for(const text of endings)check('Either side and uncertainty content pass '+text.slice(0,25),()=>assert(C.essay(text,D.cards.map(c=>c.id),null).passed));
 check('Uninspected references and invented speech do not count',()=>{assert.equal(C.essay(endings[0],[],null).refs.length,0);assert(!C.essay('Keep together. Listen for orders.',[],null).passed);});
+const parkerEssay='I think the regulars fired first. Parker said he ordered the militia to disperse and not to fire. Barker says the militia fired one or two shots first. However, Barker was on his own side and might have misunderstood the order. I would compare what each observer could see before choosing. These conflicting accounts do not identify a trigger puller with certainty, so my conclusion remains a belief.';
+check('Parker detail plus Barker passes with two inspected references',()=>{
+ const r=C.essay(parkerEssay,['depositions','barker'],null);assert(r.passed);assert.equal(r.refs.length,2);assert(r.refs.some(r=>r.card==='depositions'));assert.equal(g.ctx.WG_ESSAY.minRefs,2);
+});
+check('Parker reference is still filtered by inspection',()=>{const r=C.essay(parkerEssay,['barker'],null);assert(!r.passed);assert.equal(r.refs.length,1);});
+check('Parker detail works in either order and identifies counteraccount',()=>{
+ for(const text of ['Parker ordered dispersal and no firing.', 'An unprovoked attack without provocation is what Parker reported.'])assert(C.essay(text,['depositions'],null).refs.some(r=>r.card==='depositions'));
+ assert(C.essay(parkerEssay.replace('the regulars fired first','the militia fired first'),['depositions','barker'],null).criteria.otherSide.pass);
+});
+check('Parker and deposition wording still count as one card',()=>{assert.equal(C.essay('Parker ordered dispersal and no firing in his sworn deposition.',['depositions'],null).refs.length,1);});
+check('Bare Parker name and fictional muster speech do not count',()=>{for(const text of ['I met Parker.', 'Parker told Eli to keep together and listen for orders.', 'Parker was there. Someone else ordered dispersal.'])assert.equal(C.essay(text,['depositions'],null).refs.length,0);});
 check('Same card counted once; own hypothesis counts once',()=>{const h={version:{side:'militia',...D.sides.militia.preset}};const r=C.essay('I picked a regular in front and a charge in my game. Revere saw smoke in front and a house blocked the view.', ['revere1775'],h);assert.equal(r.refs.length,1);assert.equal(r.criteria.evidence.count,2);});
 check('Scoring marks match exact S2 base',()=>{const src=require('node:child_process').execFileSync('git',['show','3d10e9ad93b483e70c69bc7ea047555dc367cdab:data/evidence.js'],{cwd:ROOT,encoding:'utf8'}),old={};new Function('window',src)(old);for(const [card,tab] of Object.entries(old.WG_DATA.table))for(const [dim,choices] of Object.entries(tab))for(const [choice,mark] of Object.entries(choices))assert.equal(D.table[card][dim][choice][0],mark[0]);assert.equal(JSON.stringify(D.shooters),JSON.stringify(old.WG_DATA.shooters));});
 check('Invalid future checkpoints rejected',()=>{for(const patch of [s=>{s.phase='study'},s=>{s.green.essay=42},s=>{s.green.tel.inputEvents=-1}]){const s={phase:'muster-complete',accepted:true,asked:true,visited:['lantern','orchard'],returned:true,x:0,z:44,dawn:{met:true,delivered:true,listened:['near','far'],questions:['militia','town'],boundary:true,x:0,z:-15},green:g.ctx.WL_SLICE.fresh()};patch(s);const b=boot({[KEY]:JSON.stringify({version:1,run:s})});assert(!b.doc.getElementById('load'));}});

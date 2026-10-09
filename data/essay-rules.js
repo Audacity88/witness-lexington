@@ -22,7 +22,7 @@ window.WG_ESSAY = {
     { id: 'revere-later',   group: 'revere1798', label: "Revere's 1798 letter came later (same witness)", any: ["1798", "belknap", "(later|years later|23 years)[^.]{0,40}(letter|account|wrote|story)", "same witness"] },
     { id: 'revere-roar',    group: 'revere1798', label: 'two Guns, then a Continual roar', any: ["\\broar\\b", "two guns", "musquetry"] },
     { id: 'barker-shots',   group: 'barker',     label: "Barker's diary: the militia fired one or two shots first", any: ["\\bbarker\\b", "\\bdiary\\b", "one or two shots"] },
-    { id: 'depositions',    group: 'depositions', label: 'Militia depositions: the regulars fired first', any: ["depositions?", "sworn", "testimon(y|ies)"] },
+    { id: 'depositions',    group: 'depositions', label: "Parker's sworn account: dispersal, no firing, and an unprovoked attack", any: ["depositions?", "sworn", "testimon(y|ies)"] },
     { id: 'doolittle-art',  group: 'doolittle',  label: "Doolittle's engraving is an artist's picture", any: ["doolittle", "engraving", "\\bartist", "\\bpicture\\b", "\\bdrawing\\b"] },
     { id: 'outcome',        group: 'outcome',    label: '8 colonists killed and 10 wounded vs 1 British soldier wounded', any: ["\\b8\\b[^.]{0,25}(killed|dead|died|colonist)", "\\beight\\b[^.]{0,25}(killed|dead|died|colonist)", "\\b(10|ten)\\b[^.]{0,15}wounded", "(only )?(1|one)[^.]{0,20}(british|redcoat|regular|soldier)[^.]{0,20}(wounded|hurt)"] },
     { id: 'numbers',        group: 'numbers',    label: 'About 400 regulars vs about 80 militia', any: ["\\b400\\b", "four hundred", "\\b80\\b", "eighty", "outnumbered"] },
@@ -69,3 +69,14 @@ window.WG_ESSAY = {
     own: 'Bonus idea: tell what happened in YOUR tested hypothesis, e.g. which card turned red when you picked the shooter.'
   }
 };
+
+// Recognize the specific Parker evidence shown in Slice C, in either word order.
+// A bare name or the fictional muster dialogue is not a historical reference.
+(function () {
+  var detail = "\\b(disperse(?:d)?|dispersal|not (?:to )?fire|no[ -]fir(?:e|ing)|unprovoked|without (?:any )?provocation)\\b";
+  var name = "\\bparker(?:'s)?\\b", gap = "[^.!?\\n]{0,140}";
+  var patterns = [name + gap + detail, detail + gap + name];
+  var ref = window.WG_ESSAY.refs.find(function (r) { return r.id === 'depositions'; });
+  ref.any = ref.any.concat(patterns);
+  window.WG_ESSAY.accounts.militia.any = window.WG_ESSAY.accounts.militia.any.concat(patterns);
+})();

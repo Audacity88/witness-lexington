@@ -59,7 +59,9 @@
       var index = D.cards.indexOf(c);
       b('Next document', function () { s.document = D.cards[(index + 1) % D.cards.length].id; save(); render(); }, 'next-document');
       if (s.inspected.length === 9) ranking();
-      if (s.hypothesis && ranked(s)) b('Return to my essay draft', function () { env.go('essay'); }, 'return-essay');
+      if (s.hypothesis) b('Return to my essay draft', function () {
+        if (valid(s, 'essay')) env.go('essay');
+      }, 'return-essay').disabled = !valid(s, 'essay');
       b('My scene notebook', env.notebook, 'study-notebook');
     }
     function ranking() {
@@ -80,6 +82,8 @@
         next.disabled = !a || !b || a === b || s.limitation.trim().length < 12;
         // Only persist a valid distinct ordered pair. Empty selection is incomplete.
         s.rank = a && b && a !== b ? [a, b] : [];
+        var back = env.card.querySelector('#return-essay');
+        if (back) back.disabled = !valid(s, 'essay');
       }
       ready();
     }

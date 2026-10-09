@@ -58,8 +58,8 @@ try {
       }, { timeout: 30000 }, id);
       await click('#interact');
     }
-    async function typeAnswer(text) {
-      await click('#essay-text');
+    async function typeAnswer(text, selector = '#essay-text') {
+      await click(selector);
       const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
       await page.keyboard.down(modifier); await page.keyboard.press('A'); await page.keyboard.up(modifier); await page.keyboard.press('Backspace');
       await page.keyboard.type(text);
@@ -123,9 +123,18 @@ try {
         const before=ta.value;const events=[new Event('paste',{bubbles:true,cancelable:true}),new Event('drop',{bubbles:true,cancelable:true}),new InputEvent('beforeinput',{bubbles:true,cancelable:true,inputType:'insertFromPaste',data:'Outside words'})];
         return events.every(e=>!ta.dispatchEvent(e))&&ta.value===before;
       });check('Paste/drop/beforeinput blocked',blocked);
-      const draft=(await snapshot()).run.green.essay;await click('#essay-documents');await page.select('#document','revere1798');await click('#return-essay');check('Draft retained after document visit',await page.$eval('#essay-text',e=>e.value)===draft);
+      const draft=(await snapshot()).run.green.essay;await click('#essay-documents');
+      await typeAnswer('', '#limitation');check('Cleared limitation disables essay return',await page.$eval('#return-essay',e=>e.disabled));
+      await reloadAndResume();await phase('study');check('Incomplete ranking resumes with draft and dawn intact',(await snapshot()).run.green.essay===draft&&(await snapshot()).run.dawn.boundary);
+      await typeAnswer('Too short', '#limitation');check('Short limitation keeps return disabled',await page.$eval('#return-essay',e=>e.disabled));
+      await typeAnswer('The diary gives only one observer’s view.', '#limitation');
+      await page.select('#rank-1','barker');check('Duplicate ranks disable essay return',await page.$eval('#return-essay',e=>e.disabled));
+      await reloadAndResume();await phase('study');check('Invalid pair still resumes study with draft',(await snapshot()).run.green.essay===draft);
+      await page.select('#rank-0','barker');await page.select('#rank-1','revere1775');check('Repaired ranking enables return',await page.$eval('#return-essay',e=>!e.disabled));
+      await page.select('#document','revere1798');await click('#return-essay');check('Draft retained after document visit',await page.$eval('#essay-text',e=>e.value)===draft);
       await reloadAndResume();await phase('essay');check('Draft and telemetry survive refresh',(await snapshot()).run.green.essay===draft&&(await snapshot()).run.green.tel.dropAttempts===1);
       const answers=[
+        'I think the regulars fired first. Parker said he ordered the militia to disperse and not to fire. Barker says the militia fired one or two shots first. However, Barker was on his own side and might have misunderstood the order. I would compare what each observer could see before choosing. These conflicting accounts do not identify a trigger puller with certainty, so my conclusion remains a belief.',
         'I think the regulars fired first. Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first. His diary is an opposing account, and I think his blame might reflect his own side. The documents disagree, so I cannot identify an individual from smoke alone. I would need more evidence to be certain.',
         'I think the militia fired first. Barker describes one or two shots first in his diary. The militia depositions say the regulars fired first, however their own side might have reasons to deny starting the firing. Revere had a house blocking his view, so his observation cannot tell us everything. I think the British account is more likely, but I would still compare dates and positions before making a stronger claim.',
         'I cannot tell who fired first. Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first, while the militia depositions blame the regulars. These accounts disagree and I cannot tell which report captures the first trigger pull. The later letter comes from the same witness. Hearing and smoke could support a possibility without proving a person fired.'

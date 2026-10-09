@@ -49,3 +49,22 @@ node test/green-essay.mjs http://127.0.0.1:8765/index.html /tmp/wl-s3-shots
 `CHROME_BIN` may select an existing Chrome executable. The source-reviewed, syntax-checked driver walks the actual alarm and muster UI before Slice C. It tests S2-save migration, both spectator positions across the two target sizes, pause/modal movement stops, interrupted observation, shelter resume, all cited documents, ranking, both accepted account presets, fact rejection, keyboard essay access, short-answer failure, paste/drop/beforeinput blocking, draft retention, typed content passes for each side and uncertainty, completion refresh, notebook, and restart. It captures approach, obstructed pivot, aftermath, shelter, source labels, Doolittle framing, rejected hypotheses, essay failure/pass, completion, and notebook PNGs. `results.json` records checks, console errors/warnings, failed and missing requests, external requests, and failures. Any failure gives a nonzero exit code. Execution remains unverified.
 
 Pass the real screenshot and console packet to Astra code review, then Tester `lens-260` before showcase. This handoff is ready for that reviewer-owned validation. No public/project mutation, commit, push, deployment, credential access, or service control occurred. The wrapper owns the private commit/push.
+
+
+## Round 2 repair handoff
+
+- `card: WL-S3`
+- `kind: design` for the Parker essay-reference label and recognition policy in DQ-32; ranking state repair also needs code review.
+- `branch: wl-s3-green-essay`
+- `base: 6438209327e076e960eb0156420f2c264971f6db`
+- `commit: none; repairs remain uncommitted for the wrapper`
+
+Both blocking findings are addressed. P1: ranking edits update the essay-return button immediately, and its handler validates the full essay checkpoint before transition. An incomplete note or duplicate/cleared selection stays in a valid, resumable study checkpoint with the draft and prior progress intact. Restoring a valid ranking re-enables return.
+
+P2: the inherited essay rules recognize Parker with his dispersal, no-firing, or unprovoked-attack account details in either word order within one sentence. This reference stays in the existing `depositions` group and counts once, only after inspection. A bare Parker name and the fictional muster instruction do not count. The same patterns identify the militia counteraccount. The two-reference and 60-word thresholds, scoring cells, and inspected-card filtering are unchanged. The existing `[MILITIA]` source register covers these details; no historical claim or quotation was added.
+
+Changed files for this round: `src/green-essay.js`, `data/essay-rules.js`, `test/green-essay-logic.cjs`, `test/green-essay.mjs`, `DESIGN_QUESTIONS.md`, and this handoff. The expanded logic harness checks invalid limitation/pair edits, defensive return handling, refresh and restoration for both spectator runs, Parker/Barker evidence, inspection filtering, deduplication, and fictional-dialogue exclusion. The reviewer driver now types the ranking-edit reproductions, reloads their checkpoints, and types a Parker/Barker essay. Its new browser checks and screenshots still need reviewer execution; the supplied round-2 introduction screenshots do not establish Slice C visual acceptance.
+
+Chief instruction #45 is preserved: WL-S2 code/content is approved at `3d10e9ad`; browser/visual acceptance for dawn remains pending. Continue WL-S3 one card at a time. Astra review of these repairs and Tester `lens-260` visual acceptance remain reviewer-owned before showcase.
+
+Round-2 local validation: `node test/green-essay-logic.cjs` passes 69 checks; `node test/green-world.cjs` passes 136. All four changed JavaScript files pass `node --check`. The specs remain byte-identical, `SCORING.md` matches its generator, and `git diff --check` passes. These results cover the uncommitted repairs on the exact round-2 base above. No browser or screenshot work, network request, install, commit, push, or service control occurred.
