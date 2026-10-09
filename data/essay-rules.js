@@ -105,8 +105,12 @@ window.WG_ESSAY = {
     formation: "\\bmilitia\\b[^.!?]{0,60}\\b(plain sight|parade|formation|lined up)\\b|\\b(plain sight|parade|formation|lined up)\\b[^.!?]{0,60}\\bmilitia\\b",
     control: "\\b(charge|officers?|regulars?|british|soldiers?|men)\\b[^.!?]{0,60}\\b((out of|beyond)[^.!?]{0,25}control|lost control|(?:couldn't|could not) (?:stop|control))\\b"
   };
-  var revere1775 = "\\brevere(?:'s)?(?: 1775)? deposition\\b|\\brevere(?:'s)? 1775\\b|\\b1775 deposition,? (?:by )?(?:paul )?revere\\b";
-  var revere1798 = "\\b(1798|belknap)\\b|\\brevere(?:'s)?(?: later)? letter\\b|\\blater (letter|account)\\b";
+  var author = "\\brevere(?:'s)?\\b";
+  // Allow intervening reporting words, but do not borrow another named witness's document.
+  var clauseGap = "(?:(?!\\b(but|while|whereas|however|parker|barker|doolittle)\\b)[^.!?;]){0,80}";
+  var possessiveGap = "(?:(?!\\b(parker|barker|doolittle)\\b)[^.!?;]){0,160}";
+  var revere1775 = author + clauseGap + "\\bdeposition\\b|" + author + " 1775\\b|\\b1775 deposition,? (?:(?:by|of) )?(?:paul )?revere\\b|" + author + possessiveGap + "\\bhis (?:1775 )?deposition\\b";
+  var revere1798 = "\\b(1798|belknap)\\b|" + author + clauseGap + "\\bletter\\b|\\blater (letter|account)\\b|" + author + possessiveGap + "\\bhis (?:1798 |later )?letter\\b";
   window.WG_ESSAY.refs.forEach(function (r) {
     if (details[r.group]) r.detailClaim = details[r.group];
     // Shared smoke/front vocabulary does not turn an explicitly named letter into a deposition.

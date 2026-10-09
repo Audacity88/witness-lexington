@@ -234,6 +234,30 @@ check('Revere letter vocabulary does not invent a third source',()=>{
  const essayReverse=endings[0].replace('Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first.',reverse).replace('His diary', 'However, his diary');
  const reversed=C.essay(essayReverse,['revere1775','revere1798'],null);assert(reversed.passed);assert.equal(reversed.refs.length,2);assert.equal(reversed.criteria.structure.denseSentences,0);
 });
+check('Ordinary Revere comparisons preserve explicit and possessive document ownership',()=>{
+ const comparisons=[
+   "Revere said in his 1775 deposition that a house blocked his view, while his 1798 letter describes a pistol.",
+   "Revere’s 1775 deposition says a house blocked his view, while his letter says he saw a pistol.",
+   "Revere reported that a house blocked his view in his 1775 deposition, but his letter says he saw a pistol.",
+   "Revere's 1798 letter says he saw a pistol, but his 1775 deposition says a house blocked his view."
+ ];
+ for(const comparison of comparisons){
+   const essay=endings[0].replace('Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first.',comparison).replace('His diary', 'However, his diary');
+   for(const inspected of [D.cards.map(c=>c.id),['revere1775','revere1798']]){
+     const r=C.essay(essay,inspected,null);assert(r.passed,comparison);assert.equal(r.refs.length,2);assert(r.refs.some(r=>r.card==='revere1775'));assert(r.refs.some(r=>r.card==='revere1798'));assert.equal(r.criteria.structure.denseSentences,0);
+   }
+   assert.equal(C.essay(essay,['revere1775'],null).refs.length,1);
+ }
+ for(const [comparison,ids] of [
+   ["Parker's 1775 deposition says the regulars fired first, and Revere's 1798 letter describes a pistol in front of the troops.",['depositions','revere1798']],
+   ["Revere's 1798 letter says he saw smoke in front of the troops in 1775, but Barker says the militia fired first.",['revere1798','barker']]
+ ]){
+   const essay=endings[0].replace('Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first.',comparison).replace('His diary', 'However, his diary');
+   const r=C.essay(essay,D.cards.map(c=>c.id),null);assert(r.passed,comparison);assert.equal(r.refs.length,2);assert(ids.every(id=>r.refs.some(r=>r.card===id)));assert(!r.refs.some(r=>r.card==='revere1775'));assert.equal(r.criteria.structure.denseSentences,0);
+ }
+ const otherAuthor="Revere saw smoke in front of the troops, but Parker said in his 1775 deposition that the regulars fired first.";
+ const r=C.essay(otherAuthor,D.cards.map(c=>c.id),null);assert.equal(r.refs.length,2);assert(!r.refs.some(r=>r.card==='revere1798'));assert.equal(r.criteria.structure.denseSentences,0);
+});
 check('Doolittle source limitations preserve evidence and inspection filtering',()=>{
  const claims=['Doolittle was only an artist, not an eyewitness to the first shot.', 'Doolittle was an artist, so his picture cannot prove who fired first.', 'Only an artist, Doolittle was not an eyewitness to the first shot.', 'Doolittle was not an eyewitness to the first shot.'];
  for(const claim of claims){

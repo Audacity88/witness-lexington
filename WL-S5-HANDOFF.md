@@ -3,13 +3,13 @@
 - `card: WL-S5`
 - `kind: design` for essay rules/instructions, source wording, opening subtitle, GAME_DESIGN and DQ-43 through DQ-46. Slice code also received Astra code review.
 - `branch: wl-s5-polish`
-- `round: 2`
-- `base / HEAD: 1c103be62e9b5fb2bc00b95154f2a4490e385da5`
+- `round: 3`
+- `base / HEAD: f3108e0024dcbc4c32b2acba43407d600646f0da`
 - `original WL-S4 base: 245a943ff287833b172618e12155aef110118b7f`
 - `checkout: /Users/dan/witness-lexington-codex-wt/wl-s5-polish`
 - `repository: Audacity88/witness-lexington`, private
 - `commit: none; wrapper owns commit and private wl-* push`
-- `bundle SHA-256: 29c598cc7220ba1845fbf35b737b2aeda330ad2f896265ec8029a4f4f04dda0a`
+- `bundle SHA-256: 4c6544f5f5992e5bae1eb22abf45b7f3dc2b2b4004f1d087e6f397757b3e6088`
 
 ## Card results
 
@@ -81,3 +81,20 @@ Round-2 changed files: data/essay-rules.js, test/green-essay-logic.cjs, GAME_DES
 Validation: 106 controller checks, 136 geometry checks, 13 dist/fixture checks and all 20 JavaScript syntax checks pass. Offline build succeeds; both specs and generated scoring match, and git diff --check passes. Bundle SHA-256 is `29c598cc7220ba1845fbf35b737b2aeda330ad2f896265ec8029a4f4f04dda0a`.
 
 Final Astra code re-review PASS and Astra content re-review PASS, kind: design, at the exact branch/base/hash above. No remaining findings. Browser gameplay and screenshots remain unverified, with the commands and reviewer ownership above unchanged. No install, network access, service control, commit, push, or external mutation occurred.
+
+
+## Round-3 review repair
+
+- `kind: design` for source ownership recognition and the GAME_DESIGN/DQ-45 clarification; code review also required.
+- `base / HEAD: f3108e0024dcbc4c32b2acba43407d600646f0da`
+- `commit: none; leave changes uncommitted for the wrapper`
+
+The blocking source-disambiguation finding is accepted and fixed. Revere ownership now allows intervening reporting words before deposition wording and possessive document references anchored to Revere when no other named witness intervenes. Both reported comparisons now pass with the two intended Revere references. Existing inspection filtering, overlapping-vocabulary protection, Parker separation, Doolittle limitations and keyword-salad rejection remain covered.
+
+Astra caught two false third-source regressions during repair review. The final rules require deposition wording or the inherited adjacent Revere 1775 label, so a distant event year does not become a document. Reverse ownership requires direct document-author phrasing, so it cannot borrow Parker's deposition across a coordinated claim. Tests cover both cases, reversed Revere document order and the two exact user examples as complete essays.
+
+Changed files: data/essay-rules.js, test/green-essay-logic.cjs, GAME_DESIGN.md, DESIGN_QUESTIONS.md, this handoff, regenerated test/csp-gz.html and all five generated dist artifacts. Historical quotations, dialogue, source-card claims, scoring marks, Finish gates and DQ-38/39 are unchanged.
+
+Validation: 107 controller checks, 136 geometry checks, 13 dist/fixture checks and 21 JavaScript syntax checks, including the generated bundle, pass. The offline build succeeds; both specs and generated scoring match, and git diff --check passes. Both reported comparisons failed at the round-3 base with one reference and now pass with two, with no density penalty.
+
+Final Astra code re-review PASS and Astra content re-review PASS, kind: design, cover this uncommitted diff at the exact branch/base above and bundle SHA-256 `4c6544f5f5992e5bae1eb22abf45b7f3dc2b2b4004f1d087e6f397757b3e6088`. No remaining findings. Browser gameplay and screenshots remain unverified; the reviewer commands and ownership above remain current. No install, network access, service control, commit, push, or external mutation occurred.
