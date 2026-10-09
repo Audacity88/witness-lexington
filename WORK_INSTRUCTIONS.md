@@ -24,3 +24,7 @@ When ready for content review: push the branch, post a handoff in the Witness Le
 - No secrets in the repo or Workbench doc.
 - No Dan sign-off gates after design review resolves — proceed to slices.
 - Reuse v1 evidence/scoring/essay where possible; overall structure is the new game.
+
+## Playable slice validation ownership
+
+Chief/reviewer instruction #26, confirmed by Dan: headless browser playtests and screenshots run reviewer-side outside the implementer's sandbox after handoff. The implementer must not launch a browser or take screenshots. When the slice code and non-browser tests are complete, finish with `STATUS: ready`; pending reviewer browser checks do not block the implementer handoff. Include files, wrapper test commands, and anything not verified in the SUMMARY. Network stays off. Leave changes uncommitted for the wrapper; do not commit or push. WL-S1 ends at the alarm checkpoint; dawn stays for WL-S2.

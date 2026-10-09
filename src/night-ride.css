@@ -1,0 +1,42 @@
+.wl { position:relative; overflow:hidden; font:15px/1.4 system-ui,sans-serif; color:#f4f1e7; background:#101e36; }
+.wl * { box-sizing:border-box; }
+.wl [hidden] { display:none !important; }
+.wl button, .wl a { font:inherit; }
+.wl button { min-height:44px; padding:9px 14px; border:1px solid #8b9aaa; border-radius:8px; background:#243751; color:#fff; cursor:pointer; }
+.wl button:hover { background:#344c68; }
+.wl button:disabled { opacity:.55; cursor:default; }
+.wl button:focus-visible, .wl a:focus-visible { outline:3px solid #ffda8d; outline-offset:3px; }
+.wl button.primary { background:#ffda8d; border-color:#ffda8d; color:#172338; font-weight:700; }
+.wl a { color:#ffda8d; }
+.wl h1 { font-size:clamp(22px,4vw,32px); margin:0 0 8px; }
+.wl h2 { font-size:22px; margin:0 0 10px; }
+.wl p { margin:6px 0 12px; }
+.wl small { font-size:12px; color:#d0d9e5; }
+.wl .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.wl .top { position:absolute; inset:10px 10px auto; z-index:2; display:flex; justify-content:space-between; gap:12px; align-items:start; pointer-events:none; }
+.wl .top > * { pointer-events:auto; }
+.wl .brand { padding:8px 12px; border-radius:8px; background:#142237ee; }
+.wl .brand b, .wl .brand small { display:block; }
+.wl .panel { position:absolute; z-index:2; bottom:12px; left:12px; right:12px; background:#142237f2; padding:12px 16px; border:1px solid #738392; border-radius:12px; max-height:48%; overflow:auto; }
+.wl .panel p { margin:0 0 6px; }
+.wl .overlay { position:absolute; inset:0; z-index:3; display:grid; place-items:center; background:#0b1427a8; padding:12px; }
+.wl .overlay.black { background:#000; }
+.wl .card { width:min(570px,100%); max-height:100%; overflow:auto; border:1px solid #738392; border-radius:12px; background:#142237; padding:22px; }
+.wl .black .card { background:#000; border:0; }
+.wl .tag { color:#ffda8d; font-size:12px; font-weight:700; margin:0 0 6px; }
+.wl .notice { padding:6px 10px; color:#ffda8d; background:#142237; font-size:12px; }
+.wl dialog { color:#f4f1e7; background:#142237; border:1px solid #738392; border-radius:12px; width:min(560px,calc(100% - 24px)); max-height:calc(100% - 32px); padding:18px; }
+.wl dialog::backdrop { background:#080f1de0; }
+.wl dialog article { border-top:1px solid #536478; padding:8px 0; }
+.wl dialog header { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.wl dialog .close { position:sticky; bottom:-18px; background:#142237; padding:10px 0 0; }
+.wl .route button { font-size:13px; padding:8px 10px; }
+@media (max-height:450px) {
+  .wl { font-size:13px; }
+  .wl .card { padding:14px 18px; }
+  .wl .card h1 { font-size:24px; }
+  .wl .panel { padding:8px 12px; max-height:46%; }
+  .wl .brand { padding:5px 10px; }
+  .wl .top { inset:6px 8px auto; }
+  .wl button { padding:7px 10px; }
+}

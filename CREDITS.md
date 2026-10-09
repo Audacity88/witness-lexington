@@ -36,6 +36,17 @@ WL-D1 corrects this register and defines replacement content; it does not alter 
 
 ## Code & scene
 
+### WL-S1 displayed script register
+
+`data/night-ride.js` contains the complete Slice A captions, dialogue, notebook observations, and source labels. `src/night-ride.js` adds task instructions, controls, save notices, and the completion screen. This script handoff is `kind: design` as well as a code handoff.
+
+- Opening date and place resolve to `[SETTING]`; parade formation to `[FORMATION]`; the qualified force caption to `[NUMBERS]`. The displayed NPS, deposition, and secondary-account notebook labels resolve to the matching source-register rows above and passages in `SOURCES.md`.
+- The blackout sentence "These accounts do not settle who fired first" resolves to `[PIVOT]`, comparing `[R75]`, `[R98]`, `[BARKER]`, and `[MILITIA]`. The opening calls no firing animation and reveals no shooter. It is an editorial synthesis, not primary testimony.
+- The rewind date, parsonage label, Revere warning context, and notebook account of Adams and Hancock resolve to `[NIGHT]` and [the checked museum passage](SOURCES.md#night-alarm-and-escape). No precise arrival time or invented escape scene is shown.
+- Revere's two lines are the WL-D1 proposed **dramatized dialogue**. The residents' "That is what I was told" line is the proposed **fictional character** dialogue. All speech carries its label on screen. No speech is presented as a primary-source quotation.
+- Eli, the borrowed horse, Lantern and Orchard households, their residents, the alarm errands, and personal notebook observations are invented gameplay. The lane and building geometry are simplified reconstructions, not historical routes or exact architecture. "Parsonage · reconstruction", "Lantern · fictional", and "Orchard · fictional" identify those limits in the scene.
+- The completion reflection distinguishes receiving a warning from personally seeing regulars. It is a lesson about Eli's fictional observations, not new testimony about the first shot. The slice has no fact cards or MHS item labels, and does not load the unrepaired v1 evidence or essay UI. Their text repair remains with WL-S3 before reuse.
+
 - Lexington Green low-poly scene and globe transition adapted from `workbench-forge` Witness History v2.1 (`buildLexington` + geographic transition).
 - three.js r186 + OrbitControls, bundled locally (no CDN).
 - Coastline data: Natural Earth 1:50m land (public domain).

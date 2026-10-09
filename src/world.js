@@ -546,6 +546,54 @@
       globe.updateMatrixWorld(true); var wp = new T.Vector3(); pin.getWorldPosition(wp); pinLab.visible = wp.z > 0.25 && far > 0.01; pinDot.visible = wp.z > 0;
     }
 
+    // WL-S1's fictional lane uses the same low-poly people and materials as the Green.
+    function makeNight() {
+      var scene = new T.Scene(); scene.background = new T.Color(0x101e36);
+      scene.fog = new T.Fog(0x101e36, 38, 105);
+      var g = new T.Group(); scene.add(g);
+      lights(g, 0xb4d5ff, 0x403d33, 1.6, 0xb4ceff, 2.1, new T.Vector3(-20, 35, 12), 55);
+      g.add(mesh(new T.PlaneGeometry(130, 150).rotateX(-Math.PI / 2), mat(0x354c3c), false, true));
+      var lane = mesh(new T.PlaneGeometry(5, 50).rotateX(-Math.PI / 2), mat(0x897a65), false, true);
+      lane.position.set(0, 0.04, 23); g.add(lane);
+      function home(x, z, color, label) {
+        var h = new T.Group(); h.position.set(x, 0, z); g.add(h);
+        var body = mesh(new T.BoxGeometry(6, 4, 5), mat(color), true, true); body.position.y = 2; h.add(body);
+        var roof = mesh(gable(6.6, 5.8, 2), mat(0x34333b)); roof.position.y = 4; h.add(roof);
+        [-1.6, 1.6].forEach(function (wx) {
+          var win = mesh(new T.BoxGeometry(0.8, 1, 0.12), mat(0xffd18b, { emissive: 0xc48130, emissiveIntensity: 0.8 }), false);
+          win.position.set(wx, 2.1, 2.55); h.add(win);
+        });
+        var sign = labelSprite(label, '#152238', '#ffdfa0'); sign.position.set(0, 7.1, 0); sign.scale.set(9, 1.4, 1); h.add(sign);
+      }
+      home(-8, 44, 0xb2a493, 'Parsonage · reconstruction');
+      home(-8, 28, 0x876c65, 'Lantern · fictional');
+      home(8, 10, 0x82929a, 'Orchard · fictional');
+      var residents = [], rings = [];
+      [[-2.8, 44], [-2.8, 28], [2.8, 10]].forEach(function (p, i) {
+        var resident = person({ coat: i ? 0x977870 : 0x4a667b, pants: 0x6c6558, hat: 'round', hatColor: 0x292e39 });
+        resident.position.set(p[0], 0, p[1]); resident.rotation.y = i === 2 ? -Math.PI / 2 : Math.PI / 2;
+        g.add(resident); residents.push(resident);
+        var ring = new T.Mesh(new T.RingGeometry(0.7, 1.05, 16).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffd18b }));
+        ring.position.set(0, 0.07, p[1]); g.add(ring); rings.push(ring);
+      });
+      for (var i = 0; i < 24; i++) {
+        var tr = new T.Group(); tr.position.set((i % 2 ? -1 : 1) * (15 + i % 4 * 2), 0, i * 2.2 - 2);
+        var trunk = mesh(new T.CylinderGeometry(0.25, 0.35, 2, 5), mat(0x4b3621)); trunk.position.y = 1; tr.add(trunk);
+        var crown = mesh(new T.ConeGeometry(2.3, 6, 6), mat(0x304638)); crown.position.y = 4.5; tr.add(crown); g.add(tr);
+      }
+      var horse = new T.Group(), legs = [];
+      [[0.8, 0.9, 2.2, 0, 1.5, 0], [0.45, 1.1, 0.5, 0, 2.1, -1.05], [0.38, 0.4, 0.8, 0, 2.55, -1.45]].forEach(function (b) {
+        var part = mesh(new T.BoxGeometry(b[0], b[1], b[2]), mat(0x674c37)); part.position.set(b[3], b[4], b[5]); horse.add(part);
+      });
+      [[-0.28, -0.85], [0.28, -0.85], [-0.28, 0.85], [0.28, 0.85]].forEach(function (p) {
+        var leg = mesh(G.leg, mat(0x40312b)); leg.scale.set(1.3, 1.4, 1.3); leg.position.set(p[0], 1.1, p[1]); horse.add(leg); legs.push(leg);
+      });
+      var eli = person({ coat: 0xd9af55, pants: 0x45516a, hat: 'round', hatColor: 0x826547 });
+      eli.scale.setScalar(0.8); eli.position.y = 1.2; eli.rotation.y = Math.PI;
+      eli.userData.legs.forEach(function (leg) { leg.rotation.x = -1.2; }); horse.add(eli); g.add(horse);
+      return { scene: scene, horse: horse, legs: legs, rings: rings };
+    }
+
     // ---------- cameras, picking ----------
     var cam = new T.PerspectiveCamera(50, 1, 0.1, 600), camB = new T.PerspectiveCamera(50, 1, 0.1, 600);
     var controls = new T.OrbitControls(cam, cv);
@@ -560,7 +608,7 @@
 
     return {
       renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls,
-      makeLex: makeLex, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
+      makeLex: makeLex, makeNight: makeNight, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
       globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; } },
       pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3
     };
