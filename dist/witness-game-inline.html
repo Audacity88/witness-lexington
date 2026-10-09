@@ -5546,6 +5546,20 @@ window.WL_GREEN = {
       var count = env.el('p'), warning = env.el('p'); warning.id = 'paste-warning'; warning.setAttribute('role', 'status'); body.append(count, warning);
       var result = env.el('div'); result.id = 'essay-result'; result.setAttribute('role', 'status'); body.appendChild(result);
       var finish = null, pending = 0, lastInput = null, burstStart = null, burstChars = 0;
+      // Store edit deltas, not a full essay copy per keystroke. Native history may group multiple edits.
+      var edits = [], editIndex = 0;
+      function restoreCredit(text, direction) {
+        var candidate = s.essay, index = editIndex;
+        while (direction < 0 ? index > 0 : index < edits.length) {
+          var edit = edits[direction < 0 ? --index : index++];
+          var from = direction < 0 ? edit.inserted : edit.removed, to = direction < 0 ? edit.removed : edit.inserted;
+          candidate = candidate.slice(0, edit.start) + to + candidate.slice(edit.start + from.length);
+          if (candidate === text) {
+            editIndex = index; s.tel.typedChars = direction < 0 ? edit.before : edit.after; return true;
+          }
+        }
+        return false;
+      }
       function update() {
         count.textContent = C.words(s.essay) + ' / ' + E.minWords + ' words'; result.replaceChildren(); s.result = { content: null, authorship: authorship(s), priorFlags: s.priorFlags.slice(), canFinish: false };
         if (finish) { finish.remove(); finish = null; }
@@ -5566,17 +5580,24 @@ window.WL_GREEN = {
         if (pending || ['Backspace', 'Delete'].includes(e.key)) { s.tel.keystrokes++; if (['Backspace', 'Delete'].includes(e.key)) s.tel.deletes++; }
       });
       ta.addEventListener('keyup', function () { pending = 0; });
-      ta.addEventListener('input', function () {
+      ta.addEventListener('input', function (e) {
+        var restored = e.isTrusted && /^history(Undo|Redo)$/.test(e.inputType || '') && restoreCredit(ta.value, e.inputType === 'historyUndo' ? -1 : 1);
         var old = s.essay, text = ta.value, a = 0, z = 0, now = performance.now();
         while (a < old.length && a < text.length && old[a] === text[a]) a++;
         while (z < old.length - a && z < text.length - a && old[old.length - 1 - z] === text[text.length - 1 - z]) z++;
-        var inserted = text.length - a - z;
-        s.tel.typedChars = Math.max(0, s.tel.typedChars - (old.length - a - z)) + Math.min(pending, inserted); s.tel.unkeyedChars += Math.max(0, inserted - pending); pending = 0;
-        if (lastInput !== null) s.tel.typingMs += Math.min(now - lastInput, 2000);
-        lastInput = now;
-        if (burstStart === null || now - burstStart > E.telemetry.burstMs) { burstStart = now; burstChars = 0; }
-        burstChars += inserted;
-        if (burstChars >= E.telemetry.burstWords * 5) s.tel.burst++;
+        var inserted = text.length - a - z, before = s.tel.typedChars;
+        if (!restored) {
+          s.tel.typedChars = Math.max(0, s.tel.typedChars - (old.length - a - z)) + Math.min(pending, inserted); s.tel.unkeyedChars += Math.max(0, inserted - pending);
+          edits.length = editIndex;
+          edits.push({ start: a, removed: old.slice(a, old.length - z), inserted: text.slice(a, text.length - z), before: before, after: s.tel.typedChars });
+          editIndex = edits.length;
+          if (lastInput !== null) s.tel.typingMs += Math.min(now - lastInput, 2000);
+          lastInput = now;
+          if (burstStart === null || now - burstStart > E.telemetry.burstMs) { burstStart = now; burstChars = 0; }
+          burstChars += inserted;
+          if (burstChars >= E.telemetry.burstWords * 5) s.tel.burst++;
+        }
+        pending = 0;
         s.tel.inputEvents++; s.essay = text;
         if (authorship(s).flags.includes('typing speed')) s.tel.speedFlag = 1;
         update(); save();
@@ -5724,6 +5745,9 @@ window.WL_GREEN = {
       if (s && s.version === 1 && s.run && !s.run.green) s.run.green = window.WL_SLICE.fresh();
       if (s && s.run && s.run.green) {
         window.WL_SLICE.migrate(s.run.green);
+        // Older essay checkpoints allowed fact contradictions. Keep their draft and revise the hypothesis.
+        if (['essay', 'finished'].includes(s.run.phase) && window.WL_SLICE.valid(s.run.green, 'hypothesis') &&
+          s.run.green.hypothesis && !window.WL_CHECK.score(s.run.green.hypothesis.version).accepted) s.run.phase = 'hypothesis';
         if (s.run.phase === 'finished' && window.WL_SLICE.authorship(s.run.green).flags.length) s.run.phase = 'essay';
       }
       return s && s.version === 1 && valid(s.run) ? s.run : null;

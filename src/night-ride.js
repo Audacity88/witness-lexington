@@ -52,6 +52,9 @@
       if (s && s.version === 1 && s.run && !s.run.green) s.run.green = window.WL_SLICE.fresh();
       if (s && s.run && s.run.green) {
         window.WL_SLICE.migrate(s.run.green);
+        // Older essay checkpoints allowed fact contradictions. Keep their draft and revise the hypothesis.
+        if (['essay', 'finished'].includes(s.run.phase) && window.WL_SLICE.valid(s.run.green, 'hypothesis') &&
+          s.run.green.hypothesis && !window.WL_CHECK.score(s.run.green.hypothesis.version).accepted) s.run.phase = 'hypothesis';
         if (s.run.phase === 'finished' && window.WL_SLICE.authorship(s.run.green).flags.length) s.run.phase = 'essay';
       }
       return s && s.version === 1 && valid(s.run) ? s.run : null;

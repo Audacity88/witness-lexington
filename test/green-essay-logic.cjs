@@ -128,8 +128,61 @@ for(const spot of ['corner','edge']) {
    for(const ch of endings[0]){ta.dispatch('beforeinput',{isTrusted:true,inputType:'insertText',data:ch});ta.value+=ch;ta.dispatch('input');g.frame(90);}
    g.click('check-essay');assert(g.doc.getElementById('finish-investigation'));assert.equal(g.snap().run.green.tel.keystrokes,0);
  });
- g.click('retype-essay');const n=g.doc.getElementById('essay-text');type(g,'essay-text',endings[spot==='corner'?0:2]);g.click('check-essay');g.click('finish-investigation');
+ g.click('retype-essay');const n=g.doc.getElementById('essay-text');type(g,'essay-text',endings[spot==='corner'?0:2]);
+ check('Typed essay deletion undo/redo preserves credit and Finish '+spot,()=>{
+   const text=n.value, typed=g.snap().run.green.tel.typedChars;
+   n.dispatch('keydown',{key:'Backspace'});n.value='';n.dispatch('input',{inputType:'deleteContentBackward',isTrusted:true});
+   assert.equal(g.snap().run.green.tel.typedChars,0);const ms=g.snap().run.green.tel.typingMs;
+   for(const inputType of ['historyUndo','historyRedo','historyUndo']){
+     n.dispatch('keydown',{key:'z',metaKey:true});n.value=inputType==='historyRedo'?'':text;n.dispatch('input',{inputType,isTrusted:true});
+     g.click('check-essay');assert.equal(!!g.doc.getElementById('finish-investigation'),inputType==='historyUndo');
+     assert.equal(g.snap().run.green.tel.typedChars,inputType==='historyUndo'?typed:0);
+     assert.equal(g.snap().run.green.tel.typingMs,ms);assert.equal(g.snap().run.green.result.authorship.flags.length,0);
+   }
+ });
+ check('Grouped native history and new edit branches preserve credit '+spot,()=>{
+   const text=n.value;n.focus();type(g,'essay-text',' Extra words');
+   n.value=text;n.dispatch('input',{inputType:'historyUndo',isTrusted:true});g.click('check-essay');
+   assert.equal(g.snap().run.green.tel.typedChars,text.length);assert(g.doc.getElementById('finish-investigation'));
+   n.value=text+' Extra words';n.dispatch('input',{inputType:'historyRedo',isTrusted:true});
+   assert.equal(g.snap().run.green.tel.typedChars,n.value.length);
+   n.value=text;n.dispatch('input',{inputType:'historyUndo',isTrusted:true});type(g,'essay-text',' Revised words');
+   n.value=text;n.dispatch('input',{inputType:'historyUndo',isTrusted:true});
+   n.value=text+' Revised words';n.dispatch('input',{inputType:'historyRedo',isTrusted:true});
+   g.click('check-essay');assert(g.doc.getElementById('finish-investigation'));assert.equal(g.snap().run.green.result.authorship.flags.length,0);
+   n.value=text;n.dispatch('input',{inputType:'historyUndo',isTrusted:true});
+ });
+ check('Contradictory saved essay/finished checkpoints resume hypothesis revision '+spot,()=>{
+   const saved=JSON.parse(g.storage[KEY]);
+   for(const phase of ['essay','finished'])for(const legacy of [true,false]){
+     const checkpoint=JSON.parse(JSON.stringify(saved)),run=checkpoint.run;run.phase=phase;run.green.hypothesis.version.aftermath='stopped';
+     if(legacy){for(const k of ['typedChars','unkeyedChars','typingMs','burst','speedFlag'])delete run.green.tel[k];delete run.green.priorFlags;delete run.green.result;}
+     const h=boot({[KEY]:JSON.stringify(checkpoint)});assert(h.doc.getElementById('load'));h.click('load');
+     assert.equal(h.snap().run.phase,'hypothesis');assert.equal(h.snap().run.green.essay,run.green.essay);
+     assert.equal(JSON.stringify(h.snap().run.visited),JSON.stringify(run.visited));assert.equal(JSON.stringify(h.snap().run.dawn),JSON.stringify(run.dawn));
+     for(const k of ['rank','inspected','limitation','belief','hypothesis'])assert.equal(JSON.stringify(h.snap().run.green[k]),JSON.stringify(run.green[k]));
+     h.click('check-hypothesis');assert(!h.doc.getElementById('write-essay'));
+     select(h,'aftermath','fewshots');h.click('check-hypothesis');h.click('write-essay');
+     assert.equal(h.doc.getElementById('essay-text').value,run.green.essay);
+     const resumed=reload(h);assert.equal(resumed.snap().run.phase,'essay');assert.equal(resumed.snap().run.green.essay,run.green.essay);
+   }
+ });
+ g.click('check-essay');g.click('finish-investigation');
  check('Passing essay completes and resumes '+spot,()=>{assert.equal(g.snap().run.green.result.authorship.flags.length,0);assert(g.snap().run.green.result.priorFlags.length>=2);g=reload(g);assert.equal(g.snap().run.phase,'finished');assert(g.host.textContent.includes('Authorship')||g.host.textContent.includes('authorship'));});
+ check('Unknown or synthetic history cannot grant outside text credit '+spot,()=>{
+   const storage={...g.storage};
+   for(const mode of ['unknown','synthetic-known']){
+     const h=boot({...storage});h.click('load');h.click('revise-essay');const ta=h.doc.getElementById('essay-text');ta.focus();
+     const text=mode==='unknown'?endings[0]+' Outside words':ta.value;
+     ta.value='';ta.dispatch('input',{inputType:'deleteContentBackward',isTrusted:true});
+     ta.value=text;ta.dispatch('input',{inputType:'historyUndo',isTrusted:mode==='unknown'});h.click('check-essay');
+     assert(!h.doc.getElementById('finish-investigation'));assert(h.snap().run.green.result.authorship.flags.includes('text inserted without matching keystrokes'));
+     // Actual native undo/redo of an already flagged insertion retains its review flags.
+     ta.value='';ta.dispatch('input',{inputType:'historyUndo',isTrusted:true});
+     ta.value=text;ta.dispatch('input',{inputType:'historyRedo',isTrusted:true});h.click('check-essay');
+     assert(!h.doc.getElementById('finish-investigation'));assert(h.snap().run.green.result.authorship.flags.length);
+   }
+ });
  g.click('restart');g.click('confirm-restart');check('Restart clears S3 and prior slices '+spot,()=>assert.equal(Object.keys(g.storage).length,0));
 }
 const g=boot(),C=g.ctx.WL_CHECK,D=g.ctx.WG_DATA;

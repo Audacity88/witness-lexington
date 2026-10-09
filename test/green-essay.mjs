@@ -155,7 +155,35 @@ try {
       await page.$eval('#essay-text',(ta,text)=>{ta.focus();for(const ch of text){ta.dispatchEvent(new KeyboardEvent('keydown',{key:ch,bubbles:true}));ta.value+=ch;ta.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:ch}));}},answers[0]);
       await click('#check-essay');
       check('Burst blocks Finish',(await snapshot()).run.green.result.authorship.flags.includes('typing burst')&&await page.$('#finish-investigation')===null);await shot('essay-burst');
-      for(let i=0;i<answers.length;i++){await click('#retype-essay');await typeAnswer(answers[i]);await click('#check-essay');check('Content pass '+i,await page.$('#finish-investigation')!==null);check('Finish pinned '+i,await visibleAction('#finish-investigation'));await shot('essay-passed-'+i);}
+      for(let i=0;i<answers.length;i++){
+        await click('#retype-essay');await typeAnswer(answers[i]);await click('#check-essay');
+        check('Content pass '+i,await page.$('#finish-investigation')!==null);
+        check('Finish pinned '+i,await visibleAction('#finish-investigation'));await shot('essay-passed-'+i);
+        if(i===0){
+          const modifier=process.platform==='darwin'?'Meta':'Control';
+          await click('#essay-text');await page.keyboard.down(modifier);await page.keyboard.press('A');await page.keyboard.up(modifier);await page.keyboard.press('Backspace');
+          check('Typed answer deleted',await page.$eval('#essay-text',e=>e.value===''));
+          for(const redo of [false,true,false]){
+            await page.keyboard.down(modifier);if(redo)await page.keyboard.down('Shift');await page.keyboard.press('Z');if(redo)await page.keyboard.up('Shift');await page.keyboard.up(modifier);
+            await page.waitForFunction(text=>document.getElementById('essay-text').value===text,{},redo?'':answers[i]);
+            await click('#check-essay');
+            check('Native history retains authored credit '+redo, (await snapshot()).run.green.result.authorship.flags.length===0);
+            check('Native history updates Finish '+redo, (await page.$('#finish-investigation')!==null)===!redo);
+            await shot(redo?'essay-native-redo':'essay-native-undo');await click('#essay-text');
+          }
+        }
+      }
+      // Restore a structurally valid older checkpoint that was allowed to reach the essay with a contradicted hypothesis.
+      for(const checkpointPhase of ['essay','finished']){
+        const kept=(await snapshot()).run;
+        await page.evaluate(phase=>{const key='witness-lexington-s1-v1',s=JSON.parse(localStorage.getItem(key));s.run.phase=phase;s.run.green.hypothesis.version.aftermath='stopped';localStorage.setItem(key,JSON.stringify(s));},checkpointPhase);
+        await reloadAndResume();await phase('hypothesis');
+        const recovered=(await snapshot()).run;
+        check('Older '+checkpointPhase+' draft and progress retained',recovered.green.essay===kept.green.essay&&JSON.stringify(recovered.dawn)===JSON.stringify(kept.dawn)&&JSON.stringify(recovered.green.rank)===JSON.stringify(kept.green.rank));
+        await click('#check-hypothesis');check('Recovered contradiction still blocks Write',await page.$('#write-essay')===null);await shot('recovered-'+checkpointPhase);
+        await page.select('#aftermath','fewshots');await click('#check-hypothesis');await click('#write-essay');await click('#check-essay');
+        check('Recovered authored draft can finish',await page.$('#finish-investigation')!==null);
+      }
       await click('#finish-investigation');await phase('finished');await shot('finished');await reloadAndResume();await phase('finished');
       await click('#end-notebook');check('Notebook source hit target',await page.$eval('dialog a',e=>e.getBoundingClientRect().height>=44));await shot('notebook');check('Notebook retains all slices and separates documents',await page.$eval('dialog',e=>e.textContent.includes('rode back')&&e.textContent.includes('Green observations')&&e.textContent.includes('Inspected historical sources')));await click('#close-dialog');
       await click('#restart');await click('#confirm-restart');await phase('intro');check('Restart clears saved run',await page.evaluate(()=>localStorage.getItem('witness-lexington-s1-v1')===null));

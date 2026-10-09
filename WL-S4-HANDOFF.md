@@ -3,11 +3,13 @@
 - `card: WL-S4`
 - `kind: design` for GAME_DESIGN, essay instructions/rules, source labels, contradiction feedback, and the staged-view caption. Slice code also requires Astra code review.
 - `branch: wl-s4-tester-fixes`
-- `base / HEAD: 9464a99aa63b69ebb6687d7b1920e80da50a5e63` from WL-S3
+- `current round: 2`
+- `current base / HEAD: 06187d0b77cf467cfae7c9912931634f89567739`
+- `round-1 base: 9464a99aa63b69ebb6687d7b1920e80da50a5e63` from WL-S3
 - `checkout: /Users/dan/witness-lexington-codex-wt/wl-s4-tester-fixes`
 - `commit: none; wrapper owns commit and private wl-* push`
 
-## Delivery and item status
+## Round-1 delivery and item status
 
 | Tester item | Status | Change or reason |
 | --- | --- | --- |
@@ -33,9 +35,9 @@
 
 The 60-word minimum, two-reference requirement, card groups, historical scoring marks, allowed combinations and uncertainty remain inherited. No named historical person receives new words or actions. New defaults and deferrals are DQ-33 through DQ-40. SPEC.md and SPEC-lexington-game.md remain identical and unchanged.
 
-## Review and local verification
+## Round-1 review and local verification
 
-Native Astra code and content reviews ran read-only against the exact checkout, branch and HEAD/base above. Initial reviews found speed-flag dilution, near-duplicate stuffing, fictional Revere attribution and missing student instructions. Re-review caught a passive/copular evidence regression. All findings were repaired and covered with focused tests. Final code verdict: PASS, no remaining blockers. Final content verdict: PASS, `kind: design`, no remaining blockers. These verdicts cover the uncommitted source diff, not browser acceptance.
+Native Astra code and content reviews ran read-only against the exact checkout, branch and round-1 base above. Initial reviews found speed-flag dilution, near-duplicate stuffing, fictional Revere attribution and missing student instructions. Re-review caught a passive/copular evidence regression. All findings were repaired and covered with focused tests. Final code verdict: PASS, no remaining blockers. Final content verdict: PASS, `kind: design`, no remaining blockers. These verdicts cover the uncommitted source diff, not browser acceptance.
 
 - `node test/green-essay-logic.cjs`: 86 checks pass. Full stubbed UI flow at both spectator spots, authored content for either side/uncertainty, source inspection/ranking, paste/drop, refresh, prior flags, retyping, current-field ratio, rapid insertion, sticky speed, trusted native character input, repeated/near-duplicate stuffing, fictional exclusion, contradiction gating, passive evidence and low-frame-rate clock checks.
 - `node test/green-world.cjs`: 136 checks pass using bundled THREE with renderer/canvas stubs. Both spectator spots and target aspects, full obstruction rays, visible regulars, hidden shooter indicators, finite transforms and officer arrival remain covered.
@@ -62,3 +64,27 @@ Run the server in a separate process. The updated Green driver covers 1280x720 l
 Pass the browser screenshot/console packet to Astra, then Work reruns Tester lens-260 before Workbench inclusion. Browser geometry, rendering, real native-input behavior, compressed-loader execution and screenshot acceptance remain unverified locally. No network requests, credentials, installs, service control, commit, push, deployment or external project actions occurred.
 
 Changed files are the WL-S4 source/data and CSS, tools/build.mjs, generated dist, the logic/browser drivers and portable fixture/dist test, GAME_DESIGN.md, DESIGN_QUESTIONS.md, CREDITS.md, generated SCORING.md, and this handoff.
+
+
+## Round-2 repair handoff
+
+- `card: WL-S4`
+- `kind: design` for DQ-41/42 repair defaults; code review also required.
+- `branch: wl-s4-tester-fixes`
+- `base / HEAD: 06187d0b77cf467cfae7c9912931634f89567739`
+- `commit: none; leave changes uncommitted for the wrapper`
+
+Both round-2 findings are accepted and fixed.
+
+1. P1, saved draft recovery: saved essay or finished checkpoints with a structurally valid contradicted hypothesis now resume at hypothesis revision. Keep the draft, notebook/progress, inspected cards, rankings, limitation, belief and hypothesis. Hypothesis acceptance still gates essay entry. Migration covers old S3 telemetry and current checkpoints. Malformed checkpoints remain rejected.
+2. P2, native editing history: record text-edit deltas and before/after typing credit while the textarea exists. Trusted native undo/redo can restore earlier observed states, including grouped edits and new branches, without unkeyed insertion, ratio or burst penalties. Synthetic and unknown history events receive no exemption; existing flags remain sticky. Delta storage avoids keeping a full essay snapshot per keystroke. The journal is in memory; persisted credit/counters remain in the existing save, and a recreated textarea starts its own native history.
+
+Changed files for this round: src/green-essay.js, src/night-ride.js, test/green-essay-logic.cjs, test/green-essay.mjs, DESIGN_QUESTIONS.md, this handoff, and the five rebuilt dist artifacts. No historical content, scoring, source quotations, dialogue or student-facing strings changed.
+
+Native Astra code review PASS, no blockers, and Astra content/default review PASS, `kind: design`, no blockers, on the exact branch/base above. Reviewer checks passed 94 controller, 136 geometry and 8 dist checks. The small DQ-table formatting nit was corrected.
+
+Local validation: 94 controller checks pass, including both spectator runs, delete/undo/redo, grouped history, new branches, known-text synthetic history and unknown native history, retained flags, and legacy/current essay/finished checkpoint recovery through hypothesis revision and draft refresh. Geometry remains 136 checks passing; decoded distribution remains 8 checks passing. All 21 relevant JavaScript syntax checks pass, including the generated bundle. Build succeeds offline; specs, generated scoring and fixture parity match. `git diff --check` passes.
+
+The Green browser driver now exercises native Command/Ctrl-Z and Shift-Z after deleting a paced typed passing essay. It checks restored draft/credit and Finish, redo to empty, and undo again. It also restores older contradicted essay/finished save fixtures, checks draft/progress recovery, fixes the hypothesis through the UI, and returns to the draft. New screenshot names include essay-native-undo, essay-native-redo and recovered-essay/finished. Use the existing server and source/gzip/inline commands above to produce the review packet.
+
+Browser gameplay acceptance, native browser input behavior and screenshots remain unverified locally. WORK_INSTRUCTIONS.md assigns browser launch and screenshot capture to the reviewer outside this sandbox; the declared puppeteer-core dependency is unavailable here. The supplied opening screenshots establish only opening-screen rendering. Work must rerun Tester after the reviewer playtest packet. No install, network request, credential access, service control, commit or push occurred.
