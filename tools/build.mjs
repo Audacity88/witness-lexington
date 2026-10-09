@@ -45,6 +45,9 @@ const LIMIT = 1000000, inlineFits = Buffer.byteLength(inlineJson) < LIMIT - 2000
 if (inlineFits) fs.writeFileSync(path.join(DIST, 'fence-inline.json'), inlineJson); else if (fs.existsSync(path.join(DIST, 'fence-inline.json'))) fs.unlinkSync(path.join(DIST, 'fence-inline.json'));
 fs.writeFileSync(path.join(DIST, 'witness-game.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>${TITLE}</title></head><body>${gzHtml}</body></html>`);
 fs.writeFileSync(path.join(DIST, 'witness-game-inline.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>${TITLE}</title></head><body>${inlineHtml}</body></html>`);
+// Keep the CSP test payload on this same v2 build, never the v1 seed.
+const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:">`;
+fs.writeFileSync(path.join(ROOT, 'test/csp-gz.html'), rd('dist/witness-game.html').replace('<head>', '<head>' + csp));
 const B = s => Buffer.byteLength(s);
 const report = { entrypoint: files, threeBytes: B(three), imageDataUriBytes: B(img), appBytes: B(app), bundleBytes: B(bundle),
   bundleSha256: crypto.createHash('sha256').update(bundle).digest('hex'), gzFenceJsonBytes: B(gzJson), gzPayloadB64Bytes: gz.length,

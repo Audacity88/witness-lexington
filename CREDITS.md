@@ -1,4 +1,4 @@
-# Credits & licenses — Witness the First Shot
+# Credits & licenses — Witness Lexington
 
 ## Amos Doolittle, *The Battle of Lexington, April 19, 1775. Plate I* (1775)
 
@@ -41,6 +41,7 @@ WL-D1 corrects this register and defines replacement content; it does not alter 
 `data/night-ride.js` contains the complete Slice A captions, dialogue, notebook observations, and source labels. `src/night-ride.js` adds task instructions, controls, save notices, and the completion screen. This script handoff is `kind: design` as well as a code handoff.
 
 - Opening date and place resolve to `[SETTING]`; parade formation to `[FORMATION]`; the qualified force caption to `[NUMBERS]`. The displayed NPS, deposition, and secondary-account notebook labels resolve to the matching source-register rows above and passages in `SOURCES.md`.
+- The opening subtitle "Dawn of April 19 · reconstructed opening" uses the date and setting in `[SETTING]`. It labels reconstructed staging, not an eyewitness view.
 - The blackout sentence "These accounts do not settle who fired first" resolves to `[PIVOT]`, comparing `[R75]`, `[R98]`, `[BARKER]`, and `[MILITIA]`. The opening calls no firing animation and reveals no shooter. It is an editorial synthesis, not primary testimony.
 - The rewind date, parsonage label, Revere warning context, and notebook account of Adams and Hancock resolve to `[NIGHT]` and [the checked museum passage](SOURCES.md#night-alarm-and-escape). No precise arrival time or invented escape scene is shown.
 - Revere's two lines are the WL-D1 proposed **dramatized dialogue**. The residents' "That is what I was told" line is the proposed **fictional character** dialogue. All speech carries its label on screen. No speech is presented as a primary-source quotation.

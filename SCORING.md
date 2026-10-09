@@ -9,7 +9,7 @@ A version is **NOT ACCEPTED** if any *hard fact* card is red. Testimony cards ma
 |---|---|---|
 | Just in front of the regulars (`front`) | G | He saw the smoke in front of the Troops. |
 | Open ground between the lines (`between`) | - | "In front of the Troops" might mean here — or not. He doesn't say exactly. |
-| In the militia's ranks (`ranks`) | R | He saw the smoke in front of the Troops — and says he could not see the militia at all. |
+| In the militia's ranks (`ranks`) | R | He saw the smoke in front of the Troops — and says a house blocked his view of the militia at that time. |
 | Behind the stone wall (`wall`) | R | He saw the smoke in front of the Troops, not off behind the wall. |
 | Beside a house (`house`) | R | He saw the smoke in front of the Troops, not beside a house. |
 

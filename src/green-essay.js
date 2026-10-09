@@ -56,6 +56,9 @@
       env.card.append(body, actions);
     }
     function save() { env.save(); }
+    function revealResult(result) {
+      result.setAttribute('tabindex', '-1'); result.focus(); result.scrollIntoView({ block: 'start' });
+    }
     function input(tag, label, id) {
       var l = env.el('label', '', label), n = env.el(tag); n.id = id; l.htmlFor = id; body.append(l, n); return n;
     }
@@ -149,13 +152,14 @@
         writeAction = sc.accepted ? b('Write my answer', function () {
           if (C.score(v).accepted) env.go('essay');
         }, 'write-essay', true) : null;
+        revealResult(result);
       }, 'check-hypothesis', true);
       b('Change provisional belief', belief, 'change-belief'); b('Inspect documents', function () { env.go('study'); }, 'hypothesis-documents');
     }
     function finishFocus(continueFocus) { if (focusSince !== null) { g().tel.msFocused += performance.now() - focusSince; focusSince = continueFocus ? performance.now() : null; } }
     function essay() {
       var s = g(); showCard('Your answer', E.question);
-      add('Use at least ' + E.minRefs + ' evidence references and at least ' + E.minWords + ' words. Write at least three distinct claim sentences of five or more words each, connect evidence to your conclusion, and avoid repeated sentences or keyword lists. Address the opposing account and weigh it. Inspected historical cards count; your tested hypothesis can count once. Fictional speech is not primary testimony.');
+      add('Use at least ' + E.minRefs + ' evidence references and at least ' + E.minWords + ' words. Write at least three distinct claim sentences of five or more words each, connect evidence to your conclusion, and keep each sentence focused on one or two sources or facts. Use source details in complete claims and avoid repeated sentences or keyword lists. Address the opposing account and weigh it. Inspected historical cards count; your tested hypothesis can count once. Fictional speech is not primary testimony.');
       add('This is a local pattern check. Passing it does not settle history or confirm authorship. Confirmed outside authorship must be disqualified by teacher review outside this game.');
       var ta = input('textarea', 'Write your own answer', 'essay-text'); ta.rows = 8; ta.maxLength = 20000; ta.value = s.essay;
       var count = env.el('p'), warning = env.el('p'); warning.id = 'paste-warning'; warning.setAttribute('role', 'status'); body.append(count, warning);
@@ -224,14 +228,14 @@
         var r = C.essay(s.essay, s.inspected, s.hypothesis), review = authorship(s); result.replaceChildren();
         if (finish) { finish.remove(); finish = null; }
         s.result = { content: r, authorship: review, priorFlags: s.priorFlags.slice(), canFinish: r.passed && !review.flags.length };
+        if (review.flags.length) env.paragraph(result, 'Finish is blocked. Use Retype to start a fresh answer. If your input method keeps getting flagged, keep this draft and ask your teacher to review it outside the game. Your saved flags include earlier drafts; local Finish remains blocked.');
         env.paragraph(result, r.passed ? 'Content criteria met. Authorship still needs teacher review; this does not settle the first shot.' : 'Revise your answer using your inspected sources.');
         env.paragraph(result, 'Evidence ' + r.criteria.evidence.count + '/' + E.minRefs + '; other account ' + (r.criteria.otherSide.pass ? 'addressed' : 'needs weighing') + '; words ' + r.words + '/' + E.minWords + '.');
         r.hints.forEach(function (h) { env.paragraph(result, h); });
-        env.paragraph(result, 'Local review flags: ' + (review.flags.join(', ') || 'none') + '; typing rate ' + review.wordsPerMinute + ' words/minute. Accessibility input can affect these flags.');
-        if (review.flags.length) env.paragraph(result, 'Finish is blocked. Use Retype to start a fresh answer. If your input method keeps getting flagged, keep this draft and ask your teacher to review it outside the game. Your saved flags include earlier drafts; local Finish remains blocked.');
+        env.paragraph(result, 'Local review flags: ' + (review.flags.join(', ') || 'none') + '. Accessibility input can affect these flags.');
         if (s.result.canFinish) finish = b('Finish this investigation', function () {
           if (C.essay(s.essay, s.inspected, s.hypothesis).passed && !authorship(s).flags.length) env.go('finished');
-        }, 'finish-investigation', true); save();
+        }, 'finish-investigation', true); save(); revealResult(result);
       }, 'check-essay', true);
       b('Retype a fresh answer', function () {
         finishFocus();
@@ -251,7 +255,7 @@
         showCard('Investigation complete', 'Your answer meets the local content criteria. The sources still leave the first shot unresolved. [PIVOT]');
         add('Your draft, notes, inspected sources, hypothesis, and authorship review flags are saved locally.');
         add('Current authorship flags: ' + (authorship(g()).flags.join(', ') || 'none') + '. Earlier flagged drafts: ' + g().priorFlags.length + '.');
-        g().priorFlags.forEach(function (review, i) { add('Earlier draft ' + (i + 1) + ': ' + review.flags.join(', ') + '; typing rate ' + review.wordsPerMinute + ' words/minute.'); });
+        g().priorFlags.forEach(function (review, i) { add('Earlier draft ' + (i + 1) + ': ' + review.flags.join(', ') + '.'); });
         b('Read or revise my answer', function () { env.go('essay'); }, 'revise-essay', true); b('Read the notebook', env.notebook, 'end-notebook');
         b('Restart this run', env.restart, 'restart'); return;
       }

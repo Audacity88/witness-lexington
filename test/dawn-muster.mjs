@@ -78,13 +78,17 @@ try {
       await click('#interact'); await shot('parker');
       check('Parker line is visibly dramatized and sourced', await page.$eval('dialog', e => e.textContent.includes('Invented words, not a quotation.') && e.textContent.includes('[COMMAND]')));
       await click('#accept-message');
-      await page.keyboard.down('d'); await new Promise(r => setTimeout(r, 300)); await page.keyboard.up('d');
+      await page.bringToFront(); await page.keyboard.down('d');
+      try {
+        await new Promise(r => setTimeout(r, 300));
+        await page.waitForFunction(() => WitnessGame.snapshot().run.dawn.x > -11, { timeout: 5000 });
+      } finally { await page.keyboard.up('d'); }
       check('Keyboard walks on foot', (await snapshot()).run.dawn.x > -11);
       await walkTo('boundary');
       check('Early boundary cannot finish the muster', await page.$('#finish-muster') === null);
       await click('#close-dialog');
       await click('#travel-' + order[0]); await click('#pause'); const before = await snapshot();
-      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift');
       check('Pause keeps keyboard focus in its overlay', await page.evaluate(() => document.activeElement.id === 'resume'));
       await new Promise(r => setTimeout(r, 200));
       check('Pause freezes walking', JSON.stringify((await snapshot()).run.dawn) === JSON.stringify(before.run.dawn));

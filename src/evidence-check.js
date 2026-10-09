@@ -1,4 +1,4 @@
-/* Inherited scoring marks; WL-S4 essay structure guards. */
+/* Inherited scoring marks; local essay structure guards. */
 (function () {
   'use strict';
   var D = window.WG_DATA, E = window.WG_ESSAY;
@@ -34,14 +34,21 @@
     function anyPlayed() { return !!hypothesis; }
     var t = String(text || '').toLowerCase().replace(/\u2019/g, "'"), n = words(t), res = { words: n, minWords: E.minWords, refs: [], own: [], stance: null, criteria: {}, hints: [], passed: false };
     var sentences = t.split(/[.!?\n]+/).map(function (s) { return s.trim().replace(/\s+/g, ' '); }).filter(Boolean);
-    var claims = sentences.filter(function (s) { return words(s) >= E.structure.minSentenceWords && rx(E.structure.claim).test(s); });
+    function mentionsSource(r, s) {
+      return !(r.otherSource && rx(r.otherSource).test(s) && !rx(r.source).test(s)) && r.any.some(function (p) { return rx(p).test(s); });
+    }
+    function groupCount(s) {
+      return new Set(E.refs.filter(function (r) { return mentionsSource(r, s); }).map(function (r) { return r.group; })).size;
+    }
+    var dense = sentences.filter(function (s) { return groupCount(s) > E.structure.maxGroupsPerSentence; });
+    var claims = sentences.filter(function (s) { return words(s) >= E.structure.minSentenceWords && rx(E.structure.claim).test(s) && groupCount(s) <= E.structure.maxGroupsPerSentence; });
     var distinct = distinctSentences(claims), repeated = sentences.length ? 1 - distinctSentences(sentences).length / sentences.length : 0;
     var connected = claims.some(function (s) { return rx(E.structure.connective).test(s); });
-    res.criteria.structure = { pass: distinct.length >= E.structure.minSentences && repeated <= E.structure.maxRepeatedFraction && connected,
-      distinctSentences: distinct.length, repeatedFraction: repeated, connected: connected };
+    res.criteria.structure = { pass: distinct.length >= E.structure.minSentences && repeated <= E.structure.maxRepeatedFraction && connected && !dense.length,
+      denseSentences: dense.length, distinctSentences: distinct.length, repeatedFraction: repeated, connected: connected };
     // (a) evidence references in attributed claim sentences, one per card group
     var groups = {};
-    E.refs.forEach(function (r) { if (!inspected.includes(r.group) || groups[r.group]) return; if (claims.some(function (s) { return (!r.attribution || rx(r.attribution).test(s)) && (!r.exclude || !rx(r.exclude).test(s)) && r.any.some(function (p) { return rx(p).test(s); }); })) { groups[r.group] = r.id; res.refs.push({ id: r.id, card: r.group, label: r.label }); } });
+    E.refs.forEach(function (r) { if (!inspected.includes(r.group) || groups[r.group]) return; if (claims.some(function (s) { return (!r.detailClaim || rx(r.detailClaim).test(s)) && (!r.attribution || rx(r.attribution).test(s)) && (!r.exclude || !rx(r.exclude).test(s)) && mentionsSource(r, s); })) { groups[r.group] = r.id; res.refs.push({ id: r.id, card: r.group, label: r.label }); } });
     // STRONG: the kid's own reenactment (only if a personal phrase is present)
     var sents = claims.filter(function (s) { return rx(E.own.personal).test(s); });
     if (sents.length) {

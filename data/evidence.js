@@ -70,7 +70,7 @@ window.WG_DATA = {
       location: {
         front:   ['G', 'He saw the smoke in front of the Troops.'],
         between: ['-', '"In front of the Troops" might mean here — or not. He doesn\'t say exactly.'],
-        ranks:   ['R', 'He saw the smoke in front of the Troops — and says he could not see the militia at all.'],
+        ranks:   ['R', 'He saw the smoke in front of the Troops — and says a house blocked his view of the militia at that time.'],
         wall:    ['R', 'He saw the smoke in front of the Troops, not off behind the wall.'],
         house:   ['R', 'He saw the smoke in front of the Troops, not beside a house.']
       }

@@ -34,6 +34,7 @@ try {
     const phase = async p => page.waitForFunction(p => WitnessGame.snapshot().run.phase === p, { timeout: 45000 }, p);
     const check = (name, value) => { assert.ok(value, name); checks.push(name); };
     const visibleAction = async selector => page.$eval(selector, e => { const r=e.getBoundingClientRect(); return r.height>=44 && r.width>=44 && r.top>=0 && r.bottom<=innerHeight && r.left>=0 && r.right<=innerWidth; });
+    const visibleResult = async selector => page.$eval(selector, e => { const r=e.firstElementChild.getBoundingClientRect(), b=e.closest('.card-scroll').getBoundingClientRect(); return document.activeElement===e && r.top>=b.top && r.top<b.bottom; });
     const shot = async name => page.screenshot({ path: path.join(outdir, `${width}x${height}-${name}.png`) });
     async function reloadAndResume() {
       await page.reload({ waitUntil: 'load' }); await click('#load');
@@ -115,13 +116,14 @@ try {
       await page.select('#rank-1','revere1775');await click('#limitation');await page.keyboard.type('The diary gives one observer’s account and cannot establish every possible view.');
       await click('#choose-belief');await click('#belief-unsure');await phase('hypothesis');
       check('Hypothesis action pinned',await visibleAction('#check-hypothesis'));await click('#check-hypothesis');check('Militia preset accepted',await page.$eval('#hypothesis-result',e=>e.textContent.includes('Fits the inherited')));
+      check('Hypothesis result scrolled into view',await visibleResult('#hypothesis-result'));
       await page.select('#account','british');await click('#check-hypothesis');check('British preset accepted',await page.$eval('#hypothesis-result',e=>e.textContent.includes('Fits the inherited')));
       check('Account tests preserve uncertain belief',(await snapshot()).run.green.belief==='unsure');
       for(const value of ['stopped','even']){await page.select('#aftermath',value);await click('#check-hypothesis');check('Fact rejection '+value,await page.$eval('#hypothesis-result',e=>e.textContent.includes('Contradicts the inherited')));check('No essay action after rejection '+value,await page.$('#write-essay')===null);check('Contradictions named '+value,await page.$eval('#hypothesis-result',e=>e.textContent.includes('[OUTCOME]')&&!e.textContent.includes('Current document:')));await shot('rejected-'+value);}
       await page.select('#aftermath','fewshots');await click('#check-hypothesis');await click('#write-essay');await phase('essay');
       // Starting outside the overlay, Tab must reach the textarea, then wrap all controls.
       await page.evaluate(()=>document.activeElement.blur());await page.keyboard.press('Tab');check('Keyboard reaches essay',await page.evaluate(()=>document.activeElement.id==='essay-text'));
-      await page.keyboard.press('Shift+Tab');check('Reverse Tab wraps',await page.evaluate(()=>document.activeElement.id==='essay-notebook'));await page.keyboard.press('Tab');
+      await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift');check('Reverse Tab wraps',await page.evaluate(()=>document.activeElement.id==='essay-notebook'));await page.keyboard.press('Tab');
       await typeAnswer('I believe the regulars fired first.');await click('#check-essay');check('Short unsupported essay fails',await page.$('#finish-investigation')===null);await shot('essay-failed');
       const blocked=await page.$eval('#essay-text',ta=>{
         const before=ta.value;const events=[new Event('paste',{bubbles:true,cancelable:true}),new Event('drop',{bubbles:true,cancelable:true}),new InputEvent('beforeinput',{bubbles:true,cancelable:true,inputType:'insertFromPaste',data:'Outside words'})];
@@ -146,8 +148,14 @@ try {
       await click('#retype-essay');
       await typeAnswer('Barker diary Parker disperse 400 however British account depositions. '.repeat(8));await click('#check-essay');
       check('Keyword stuffing blocked',await page.$('#finish-investigation')===null);await shot('essay-stuffing');
+      await click('#retype-essay');await typeAnswer(fs.readFileSync(new URL('./fixtures/keyword-salad.txt',import.meta.url),'utf8'));await click('#check-essay');
+      check('Shuffled keyword salad fails content',(await snapshot()).run.green.result.content.passed===false);await shot('essay-keyword-salad');
       await page.$eval('#essay-text',ta=>{ta.value='I think the regulars fired first. Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first. His diary is an opposing account, and I think his blame might reflect his own side. The documents disagree, so I cannot identify an individual from smoke alone. I would need more evidence to be certain.';ta.dispatchEvent(new Event('input',{bubbles:true}));});
       await click('#check-essay');check('Insertion after typing blocked',await page.$('#finish-investigation')===null);
+      check('Blocked explanation visible',await visibleResult('#essay-result'));
+      check('Blocked explanation comes first',await page.$eval('#essay-result',e=>e.firstElementChild.textContent.startsWith('Finish is blocked.')));
+      check('Student feedback hides raw typing rate',await page.$eval('.card',e=>!e.textContent.includes('words/minute')&&!e.textContent.includes('typing rate')));
+      check('Raw rate retained for teacher flags',Number.isFinite((await snapshot()).run.green.result.authorship.wordsPerMinute));
       check('Per-field ratio and persisted flags',(await snapshot()).run.green.result.authorship.flags.includes('low keystroke ratio'));await shot('essay-insert-blocked');
       await reloadAndResume();await click('#check-essay');check('Flags survive reload',await page.$('#finish-investigation')===null);
       await click('#retype-essay');
@@ -176,8 +184,11 @@ try {
       // Restore a structurally valid older checkpoint that was allowed to reach the essay with a contradicted hypothesis.
       for(const checkpointPhase of ['essay','finished']){
         const kept=(await snapshot()).run;
-        await page.evaluate(phase=>{const key='witness-lexington-s1-v1',s=JSON.parse(localStorage.getItem(key));s.run.phase=phase;s.run.green.hypothesis.version.aftermath='stopped';localStorage.setItem(key,JSON.stringify(s));},checkpointPhase);
-        await reloadAndResume();await phase('hypothesis');
+        // pagehide writes the live run first; apply the recovery fixture before the new app loads.
+        const recovery = await page.evaluateOnNewDocument(phase=>{const key='witness-lexington-s1-v1',s=JSON.parse(localStorage.getItem(key));s.run.phase=phase;s.run.green.hypothesis.version.aftermath='stopped';localStorage.setItem(key,JSON.stringify(s));window.wlRecoveryFixture=phase;},checkpointPhase);
+        await page.reload({waitUntil:'load'}); await page.removeScriptToEvaluateOnNewDocument(recovery.identifier);
+        check('Recovery fixture applied before app startup '+checkpointPhase,await page.evaluate(phase=>window.wlRecoveryFixture===phase,checkpointPhase));
+        await click('#load');await phase('hypothesis');
         const recovered=(await snapshot()).run;
         check('Older '+checkpointPhase+' draft and progress retained',recovered.green.essay===kept.green.essay&&JSON.stringify(recovered.dawn)===JSON.stringify(kept.dawn)&&JSON.stringify(recovered.green.rank)===JSON.stringify(kept.green.rank));
         await click('#check-hypothesis');check('Recovered contradiction still blocks Write',await page.$('#write-essay')===null);await shot('recovered-'+checkpointPhase);

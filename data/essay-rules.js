@@ -1,4 +1,4 @@
-/* Witness the First Shot — ESSAY CHECK RULES (local only: no AI, no network).
+/* Witness Lexington — ESSAY CHECK RULES (local only: no AI, no network).
    Question: "Which side do you believe fired first, and why?"
 
    PASS = evidence, counteraccount, length, and sentence structure:
@@ -14,7 +14,7 @@ window.WG_ESSAY = {
   question: 'Which side do you believe fired first, and why?',
   minWords: 60,
   minRefs: 2,
-  structure: { minSentences: 3, minSentenceWords: 5, maxRepeatedFraction: 0.25, nearDuplicate: 0.75,
+  structure: { minSentences: 3, minSentenceWords: 5, maxRepeatedFraction: 0.25, nearDuplicate: 0.75, maxGroupsPerSentence: 2,
     claim: "\\b(is|are|was|were|saw|heard|fired|ordered|said|says|say|describes?|claims?|reported|stood|blocked|had|shows?|appeared|think|believe|cannot|could|might|would|disagree|gives?|came|comes?|fits?|picked|chose)\\b",
     connective: "\\b(because|but|however|although|though|while|so|therefore|since|yet)\\b" },
 
@@ -63,7 +63,7 @@ window.WG_ESSAY = {
   telemetry: { lowRatio: 0.6, minCharsForRatio: 80, maxWPM: 300, minWordsForSpeed: 20, burstWords: 12, burstMs: 1000 },
 
   hints: {
-    structure: 'Write at least three distinct claim sentences of five or more words each and connect evidence to your conclusion. Remove repeated or near-duplicate sentences and keyword lists.',
+    structure: 'Write at least three distinct claim sentences of five or more words each and connect evidence to your conclusion. Use source details in complete claims. Keep each sentence focused on one or two sources or facts; remove repeated or near-duplicate sentences and keyword lists.',
     length: 'Write a bit more: aim for at least {min} words (you have {n}).',
     refs0: 'Use the evidence! Mention at least 2 details from the cards, like the house that blocked Revere\u2019s view, the "Pistol", or 8 killed vs 1 wounded.',
     refs1: 'Good start with {got}. Add one more piece of evidence from a different card.',
@@ -91,5 +91,26 @@ window.WG_ESSAY = {
     if (r.group === 'revere1775') r.attribution = "\\brevere(?:'s)?\\b[^.!?]{0,40}\\b(saw|heard|could not see|couldn't see|view|reported|wrote|said|says|deposition)\\b|\\b(blocked|covered|hid)[^.!?]{0,20}\\brevere(?:'s)?\\b|1775 deposition[^.!?]{0,40}\\b(says|reports|describes)\\b";
     if (r.group === 'revere1798') r.attribution = "\\brevere(?:'s)?\\b[^.!?]{0,50}\\b(saw|heard|described|wrote|said|says|reported|letter|account)\\b|\\b(1798|belknap)\\b[^.!?]{0,40}\\b(letter|account|says|reports|describes)\\b";
     if (r.attribution) r.exclude = "\\b(eli|my (view|game|scene)|i (saw|heard|stood|met)|fictional (scene|view|observation))\\b";
+  });
+})();
+
+// A source name alone is not a claim. Keep passive facts and source limitations eligible.
+(function () {
+  var details = {
+    revere1798: "\\b(saw|heard|appeared|described)\\b[^.!?]{0,60}\\bpistol\\b|\\bpistol\\b[^.!?]{0,40}\\b(appeared|fired)\\b|\\b(later|1798|belknap|same witness|two guns|roar|musquetry)\\b",
+    barker: "\\b(barker|diary)\\b[^.!?]{0,140}\\b(one or two shots|(?:militia|colonists|minutemen) (?:fired|shot))\\b|\\b(one or two shots|(?:militia|colonists|minutemen) (?:fired|shot))\\b[^.!?]{0,140}\\b(barker|diary)\\b",
+    depositions: "\\b(parker|depositions?|sworn|testimony)\\b[^.!?]{0,140}\\b(fired|shot|disperse(?:d)?|dispersal|not (?:to )?fire|no[ -]fir(?:e|ing)|unprovoked|without (?:any )?provocation)\\b|\\b(fired|shot|disperse(?:d)?|dispersal|not (?:to )?fire|no[ -]fir(?:e|ing)|unprovoked|without (?:any )?provocation)\\b[^.!?]{0,140}\\b(parker|depositions?|sworn|testimony)\\b",
+    doolittle: "\\b(artist|engraving|picture|drawing)\\b[^.!?]{0,60}\\b(artist|pictured|depicts?|shows?|portrays?|proof)\\b|\\bdoolittle(?:'s)?\\b[^.!?]{0,60}\\b(pictured|depicts?|shows?|portrays?)\\b",
+    numbers: "\\b(400|four hundred|80|eighty)\\b[^.!?]{0,30}\\b(regulars?|british|militia|colonists|soldiers?)\\b|\\b(regulars?|british|militia|colonists|soldiers?)\\b[^.!?]{0,30}\\b(400|four hundred|80|eighty|outnumbered)\\b",
+    formation: "\\bmilitia\\b[^.!?]{0,60}\\b(plain sight|parade|formation|lined up)\\b|\\b(plain sight|parade|formation|lined up)\\b[^.!?]{0,60}\\bmilitia\\b",
+    control: "\\b(charge|officers?|regulars?|british|soldiers?|men)\\b[^.!?]{0,60}\\b((out of|beyond)[^.!?]{0,25}control|lost control|(?:couldn't|could not) (?:stop|control))\\b"
+  };
+  window.WG_ESSAY.refs.forEach(function (r) {
+    if (details[r.group]) r.detailClaim = details[r.group];
+    if (r.group === 'depositions') {
+      // Revere's singular deposition is not Parker's source, even when Barker shares the sentence.
+      r.otherSource = "\\brevere(?:'s)?\\b|\\b1775 deposition\\b";
+      r.source = "\\bparker(?:'s)?\\b|\\bmilitia(?:'s)?(?: sworn)? depositions?\\b|\\bdepositions\\b";
+    }
   });
 })();

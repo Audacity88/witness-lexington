@@ -46,10 +46,11 @@ try {
     try {
       await page.goto(url, { waitUntil: 'load' });
       await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'load' });
+      check('Opening subtitle matches dawn', await page.$eval('.brand small', e => e.textContent.includes('Dawn of April 19')));
       await click('#begin');
       if (width === 960) {
         await click('#pause'); const before = await snapshot();
-        await page.keyboard.press('Shift+Tab');
+        await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift');
         check('Pause traps keyboard focus', await page.evaluate(() => document.activeElement.id === 'resume'));
         await new Promise(r => setTimeout(r, 200));
         check('Opening pauses its clock', (await snapshot()).elapsed === before.elapsed);
@@ -64,7 +65,11 @@ try {
       await page.keyboard.press('e'); await shot('revere');
       check('Revere speech is labeled', await page.$eval('dialog', e => e.textContent.includes('Dramatized dialogue') && e.textContent.includes('not a quotation')));
       await click('#ask-source'); await click('#accept');
-      await page.keyboard.down('w'); await new Promise(r => setTimeout(r, 300)); await page.keyboard.up('w');
+      await page.bringToFront(); await page.keyboard.down('w');
+      try {
+        await new Promise(r => setTimeout(r, 300));
+        await page.waitForFunction(() => WitnessGame.snapshot().run.z < 44, { timeout: 5000 });
+      } finally { await page.keyboard.up('w'); }
       check('Keyboard rides the horse', (await snapshot()).run.z < 44);
       await shot('ride');
       await click('#travel-' + order[0]); await click('#pause'); const before = await snapshot();

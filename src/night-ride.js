@@ -55,7 +55,9 @@
         // Older essay checkpoints allowed fact contradictions. Keep their draft and revise the hypothesis.
         if (['essay', 'finished'].includes(s.run.phase) && window.WL_SLICE.valid(s.run.green, 'hypothesis') &&
           s.run.green.hypothesis && !window.WL_CHECK.score(s.run.green.hypothesis.version).accepted) s.run.phase = 'hypothesis';
-        if (s.run.phase === 'finished' && window.WL_SLICE.authorship(s.run.green).flags.length) s.run.phase = 'essay';
+        // Changed content rules must not discard a structurally valid completed draft.
+        if (s.run.phase === 'finished' && window.WL_SLICE.valid(s.run.green, 'essay') &&
+          (!window.WL_CHECK.essay(s.run.green.essay, s.run.green.inspected, s.run.green.hypothesis).passed || window.WL_SLICE.authorship(s.run.green).flags.length)) s.run.phase = 'essay';
       }
       return s && s.version === 1 && valid(s.run) ? s.run : null;
     }
@@ -78,7 +80,7 @@
   }
   function paragraph(parent, text, cls) { parent.appendChild(el('p', cls || '', text)); }
   var top = el('div', 'top'), brand = el('div', 'brand'), tools = el('div', 'row');
-  brand.appendChild(el('b', '', 'Witness Lexington')); var chapter = el('small', '', 'The night alarm'); brand.appendChild(chapter);
+  brand.appendChild(el('b', '', 'Witness Lexington')); var chapter = el('small', '', 'Dawn of April 19 · reconstructed opening'); brand.appendChild(chapter);
   var notebookButton = button('Notebook', notebook, 'notebook');
   var pauseButton = button('Pause', function () { setPaused(!paused); }, 'pause');
   tools.append(notebookButton, pauseButton); top.append(brand, tools); host.appendChild(top);
@@ -156,7 +158,7 @@
   }
   function rewind() { go('rewind'); }
   function render() {
-    chapter.textContent = later() ? modern() ? 'Modern study · evidence and answer' : 'Lexington Green · reconstructed scene' : ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
+    chapter.textContent = ['intro', 'opening', 'blackout'].includes(state.phase) ? 'Dawn of April 19 · reconstructed opening' : later() ? modern() ? 'Modern study · evidence and answer' : 'Lexington Green · reconstructed scene' : ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
     panel.hidden = !playable(); overlay.hidden = true;
     top.inert = paused || !playable() && state.phase !== 'opening';
     panel.inert = paused || !playable() && state.phase !== 'opening';

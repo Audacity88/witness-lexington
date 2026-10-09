@@ -7,6 +7,7 @@ class Element {
  append(...nodes){nodes.forEach(n=>{n.remove();n.parent=this;this.children.push(n)});}
  remove(){if(this.parent){this.parent.children=this.parent.children.filter(n=>n!==this);this.parent=null;}} appendChild(n){this.append(n);return n;}
  replaceChildren(...nodes){this._text='';this.children=[];this.append(...nodes);}
+ scrollIntoView(options){this.scrolled=options;}
  setAttribute(k,v){this[k]=v;} addEventListener(k,fn){(this.events[k]??=[]).push(fn);} dispatch(k,e={}){for(const fn of this.events[k]||[]) fn(e);}
  focus(){const old=this.doc.activeElement;if(old!==this){old?.dispatch('blur');this.doc.activeElement=this;this.dispatch('focus');}} get isConnected(){return true;} getClientRects(){return this.hidden?[]:[{}];} setPointerCapture(){}
  contains(n){return n===this||this.children.some(c=>c.contains(n));}
@@ -67,7 +68,7 @@ for(const spot of ['corner','edge']) {
  select(g,'rank-0','barker');select(g,'rank-1','barker');
  check('Duplicate ranking cannot continue '+spot,()=>assert(g.doc.getElementById('choose-belief').disabled));
  select(g,'rank-1','revere1775');type(g,'limitation','The diary is only one observer’s account.');g.click('choose-belief');g.click('belief-unsure');
- g.click('check-hypothesis');check('Militia account preset accepted '+spot,()=>{assert(g.host.querySelector('#hypothesis-result').textContent.includes('Fits the inherited'));assert(g.snap().run.green.belief==='unsure');});
+ g.click('check-hypothesis');check('Hypothesis result receives focus and scroll '+spot,()=>{const r=g.doc.getElementById('hypothesis-result');assert.equal(g.doc.activeElement,r);assert.equal(r.scrolled.block,'start');});check('Militia account preset accepted '+spot,()=>{assert(g.host.querySelector('#hypothesis-result').textContent.includes('Fits the inherited'));assert(g.snap().run.green.belief==='unsure');});
  select(g,'account','british');g.click('check-hypothesis');check('British preset also accepted '+spot,()=>assert(g.host.querySelector('#hypothesis-result').textContent.includes('Fits the inherited')));
  for(const a of ['stopped','even']){select(g,'aftermath',a);g.click('check-hypothesis');check('Hard facts reject '+a+' '+spot,()=>{assert(g.host.querySelector('#hypothesis-result').textContent.includes('Contradicts the inherited'));assert(!g.doc.getElementById('write-essay'));assert(g.host.querySelector('#hypothesis-result').textContent.includes('[OUTCOME]'));assert(g.host.querySelector('#hypothesis-result').textContent.includes('Paul Revere'));});}
  select(g,'aftermath','fewshots');g.click('check-hypothesis');g.click('write-essay');
@@ -122,6 +123,11 @@ for(const spot of ['corner','edge']) {
    g.click('check-essay');assert(!g.doc.getElementById('finish-investigation'));
    assert(g.snap().run.green.result.authorship.flags.includes('typing speed'));
    assert(g.snap().run.green.result.authorship.flags.includes('typing burst'));
+   const result=g.doc.getElementById('essay-result'), saved=JSON.parse(g.storage[KEY]).run.green.result.authorship;
+   assert.equal(g.doc.activeElement,result);assert.equal(result.scrolled.block,'start');
+   assert(result.children[0].textContent.startsWith('Finish is blocked.'));
+   assert(!result.textContent.includes('words/minute'));assert(!result.textContent.includes('typing rate'));
+   assert(saved.wordsPerMinute>300);
  });
  check('Trusted on-screen characters work without keydown '+spot,()=>{
    g.click('retype-essay');const ta=g.doc.getElementById('essay-text');ta.focus();
@@ -168,7 +174,14 @@ for(const spot of ['corner','edge']) {
    }
  });
  g.click('check-essay');g.click('finish-investigation');
- check('Passing essay completes and resumes '+spot,()=>{assert.equal(g.snap().run.green.result.authorship.flags.length,0);assert(g.snap().run.green.result.priorFlags.length>=2);g=reload(g);assert.equal(g.snap().run.phase,'finished');assert(g.host.textContent.includes('Authorship')||g.host.textContent.includes('authorship'));});
+ check('Completed save with newly rejected content resumes for revision '+spot,()=>{
+   const s=JSON.parse(g.storage[KEY]);s.run.phase='finished';s.run.green.essay=fs.readFileSync(ROOT+'test/fixtures/keyword-salad.txt','utf8');
+   const h=boot({[KEY]:JSON.stringify(s)});assert(h.doc.getElementById('load'));h.click('load');assert.equal(h.snap().run.phase,'essay');
+   for(const k of ['essay','rank','inspected','limitation','belief','hypothesis','tel','priorFlags'])assert.equal(JSON.stringify(h.snap().run.green[k]),JSON.stringify(s.run.green[k]));
+   assert.equal(JSON.stringify(h.snap().run.dawn),JSON.stringify(s.run.dawn));assert.equal(JSON.stringify(h.snap().run.visited),JSON.stringify(s.run.visited));
+   h.click('check-essay');assert(!h.doc.getElementById('finish-investigation'));const resumed=reload(h);assert.equal(resumed.snap().run.phase,'essay');assert.equal(resumed.snap().run.green.essay,s.run.green.essay);
+ });
+ check('Passing essay completes and resumes '+spot,()=>{assert.equal(g.snap().run.green.result.authorship.flags.length,0);assert(g.snap().run.green.result.priorFlags.length>=2);g=reload(g);assert.equal(g.snap().run.phase,'finished');assert(g.host.textContent.includes('Authorship')||g.host.textContent.includes('authorship'));assert(!g.host.textContent.includes('typing rate'));assert(!g.host.textContent.includes('words/minute'));assert(g.snap().run.green.priorFlags.some(r=>r.wordsPerMinute>300));});
  check('Unknown or synthetic history cannot grant outside text credit '+spot,()=>{
    const storage={...g.storage};
    for(const mode of ['unknown','synthetic-known']){
@@ -186,15 +199,25 @@ for(const spot of ['corner','edge']) {
  g.click('restart');g.click('confirm-restart');check('Restart clears S3 and prior slices '+spot,()=>assert.equal(Object.keys(g.storage).length,0));
 }
 const g=boot(),C=g.ctx.WL_CHECK,D=g.ctx.WG_DATA;
+check('Opening subtitle describes dawn, not the night alarm',()=>{assert(g.host.querySelector('.brand').textContent.includes('Dawn of April 19'));g.click('begin');assert(g.host.querySelector('.brand').textContent.includes('Dawn of April 19'));g.click('skip');assert(g.host.querySelector('.brand').textContent.includes('Dawn of April 19'));});
+check('Revere contradiction preserves the time-limited house obstruction',()=>{const line=D.table.revere1775.location.ranks[1];assert(line.includes('at that time'));assert(line.includes('house blocked'));assert(!line.includes('at all'));});
 for(const text of endings)check('Either side and uncertainty content pass '+text.slice(0,25),()=>assert(C.essay(text,D.cards.map(c=>c.id),null).passed));
 check('Uninspected references and invented speech do not count',()=>{assert.equal(C.essay(endings[0],[],null).refs.length,0);assert(!C.essay('Keep together. Listen for orders.',[],null).passed);});
 const parkerEssay='I think the regulars fired first. Parker said he ordered the militia to disperse and not to fire. Barker says the militia fired one or two shots first. However, Barker was on his own side and might have misunderstood the order. I would compare what each observer could see before choosing. These conflicting accounts do not identify a trigger puller with certainty, so my conclusion remains a belief.';
 check('Parker detail plus Barker passes with two inspected references',()=>{
  const r=C.essay(parkerEssay,['depositions','barker'],null);assert(r.passed);assert.equal(r.refs.length,2);assert(r.refs.some(r=>r.card==='depositions'));assert.equal(g.ctx.WG_ESSAY.minRefs,2);
 });
+check('Ordinary source attribution and past tense preserve good essays',()=>{
+ for(const claim of ['According to Barker, the militia fired one or two shots first.', 'The militia fired one or two shots first, according to Barker.', 'Barker described one or two shots fired by the militia.'])assert(C.essay(parkerEssay.replace('Barker says the militia fired one or two shots first.',claim),['depositions','barker'],null).passed);
+ const reverse=parkerEssay.replace('Parker said he ordered the militia to disperse and not to fire.', 'The militia were ordered to disperse and not to fire, according to Parker.');assert(C.essay(reverse,['depositions','barker'],null).passed);
+});
+check('Revere deposition and Barker are two source groups',()=>{
+ const text=endings[0].replace('Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first.', "Revere's 1775 deposition says a house blocked his view of the militia, but Barker says the militia fired one or two shots first.");
+ const r=C.essay(text,D.cards.map(c=>c.id),null);assert(r.passed);assert.equal(r.refs.length,2);assert.equal(r.criteria.structure.denseSentences,0);
+});
 check('Parker reference is still filtered by inspection',()=>{const r=C.essay(parkerEssay,['barker'],null);assert(!r.passed);assert.equal(r.refs.length,1);});
 check('Parker detail works in either order and identifies counteraccount',()=>{
- for(const text of ['Parker ordered dispersal and no firing.', 'An unprovoked attack without provocation is what Parker reported.'])assert(C.essay(text,['depositions'],null).refs.some(r=>r.card==='depositions'));
+ for(const text of ['Parker ordered dispersal and no firing.', 'An unprovoked attack without provocation is what Parker reported.', 'The militia were ordered to disperse and not to fire, according to Parker.'])assert(C.essay(text,['depositions'],null).refs.some(r=>r.card==='depositions'));
  assert(C.essay(parkerEssay.replace('the regulars fired first','the militia fired first'),['depositions','barker'],null).criteria.otherSide.pass);
 });
 check('Parker and deposition wording still count as one card',()=>{assert.equal(C.essay('Parker ordered dispersal and no firing in his sworn deposition.',['depositions'],null).refs.length,1);});
@@ -204,6 +227,13 @@ check('Scoring marks match portable S2 fixture',()=>{const old=JSON.parse(fs.rea
 check('Keyword stuffing fails sentence structure',()=>{
  const r=C.essay('Barker diary Parker disperse 400 however British account depositions. '.repeat(8),D.cards.map(c=>c.id),null);
  assert(!r.passed);assert(!r.criteria.structure.pass);assert.equal(r.refs.length,0);
+});
+check('Six distinct shuffled keyword sentences fail content',()=>{
+ const text=fs.readFileSync(ROOT+'test/fixtures/keyword-salad.txt','utf8'),r=C.essay(text,D.cards.map(c=>c.id),null);
+ assert(!r.passed);assert(!r.criteria.structure.pass);assert(r.criteria.structure.denseSentences>0);assert(r.criteria.structure.repeatedFraction<=0.25);assert(r.words>=60);
+});
+check('Bare source names with claim verbs do not earn evidence',()=>{
+ for(const text of ['Barker diary is useful because this account is important.', 'The militia depositions are useful because they are sworn.', 'The numbers card says 400 because numbers are important.', 'Doolittle says the engraving is useful because pictures matter.'])assert.equal(C.essay(text,D.cards.map(c=>c.id),null).refs.length,0);
 });
 check('Repeated fluent claims cannot inflate an essay',()=>{
  const r=C.essay('Barker says the militia fired one or two shots first, however Parker ordered dispersal. '.repeat(8),D.cards.map(c=>c.id),null);
