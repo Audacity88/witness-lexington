@@ -1,4 +1,4 @@
-/* Witness the First Shot — evidence cards, choices, and the SCORING TABLE.
+/* Witness Lexington — evidence cards, choices, and the SCORING TABLE.
    Readable data, no logic beyond the tiny combine rule documented below.
    Use ONLY the facts and quotes given in the brief. Quotes are verbatim, original spelling kept.
 

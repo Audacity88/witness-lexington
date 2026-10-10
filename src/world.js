@@ -1,4 +1,4 @@
-/* Witness the First Shot — 3D world: Lexington Green (refactored from witness.js v2.1 buildLexington)
+/* Witness Lexington — 3D world: Lexington Green (refactored from witness.js v2.1 buildLexington)
    and the low-poly globe (from witness.js v2.1's geographic transition). Classic script; needs
    window.THREE (three r186 + OrbitControls) and window.WG_COAST_B64. Defines window.WGWorld. */
 (function () {
