@@ -904,7 +904,10 @@
           lex.fx.clear(); lex.militia.forEach(function (m) { m.visible = true; }); walkers.pose(x, z, dx, dz, time);
           walkers.rings.forEach(function (r, i) { r.visible = phase === 'shelter' ? stops[i].id === 'shelter' : phase === 'green'; });
           // Hide destination labels during observation so they cannot float through the obstruction.
-          walkers.group.children.forEach(function (c) { if (c.isSprite) c.visible = ['green', 'shelter'].includes(phase); });
+          // The shelter label waits for the shelter step so it never reads as a choice at the spot-choosing step.
+          walkers.group.children.forEach(function (c) {
+            if (c.isSprite) c.visible = phase === 'shelter' ? c.userData.label.id === 'shelter' : phase === 'green' && c.userData.label.id !== 'shelter';
+          });
           blocker.visible = phase === 'green-event' && t >= 6 && t < 10;
           if (phase === 'green-event') {
             time = t;
