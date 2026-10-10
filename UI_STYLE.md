@@ -126,8 +126,13 @@ Every surface the student reads uses one frame:
 - The name is set in IM Fell SC. Text after a " · " separator, such as "fictional" or "reconstruction", goes on a second line in rubric italic. The text itself is unchanged.
 - Each canvas is sized to its text, and the text carries a same-colour stroke so it stays solid when scaled down.
 - Labels keep a fixed size on screen rather than shrinking with distance. The name is at least 18px (up to 24px on tall screens), and the second line is at least 14px.
-- Every frame, labels are laid out in screen space, nearest first. Each is clamped inside the viewport and kept clear of the brand plate, the HUD buttons, the bottom strip and labels already placed. If its spot is taken, it steps just above, below or beside the obstacle.
-- A label fades out when its anchor is off screen or under the HUD, or when no free spot is close to its marker. The waypoint buttons still name every stop, so nothing is lost.
+- Every frame, labels are laid out in screen space. Each is clamped inside the viewport and kept clear of the brand plate, the HUD buttons, the bottom strip and labels already placed. If its spot is taken, it steps just above, below or beside the obstacle.
+- **Objective labels always show.** The label of every stop the current objective points to is placed before all others and never fades. Examples are Parker first, then the outstanding muster tasks, both spectator spots at the Green's choose-spot step, and the shelter at the shelter step.
+  - **Seal on screen:** the label stays by its seal, taking the nearest free slot if crowded.
+  - **Seal off screen or under the panel:** the label is pinned at the nearest point of the safe band between the HUD and the bottom strip. A wax arrow with an ink outline sits beside it on the side facing the seal and turns to point at it. Pinned labels are placed first because they have the fewest free slots.
+- Other labels follow nearest first. They fade out when their anchor is off screen or under the HUD, or when no free spot is close to the marker. The waypoint buttons still name every stop, so nothing is lost.
+- **Leaders:** muster and Green labels sit just above head height. Whenever a label and its seal are apart, an ink leader line with paper edges runs from the seal's rim to the label's pointer, so each label is visibly tied to its seal. Night-ride signs label their house and need no leader.
+- The Shelter label stays hidden until the shelter step, so it never reads as a choice at the choose-spot step.
 - Labels redraw once the bundled fonts finish loading.
 
 ### Stop and listening-spot markers: wax seals
@@ -175,7 +180,7 @@ Every surface the student reads uses one frame:
 Three sizes are the contract: 662x418 (the embed widget), 960x540, and 1280x720. At each size:
 
 - The HUD, the bottom strip's primary button, every waypoint button, and every card's action footer are fully visible without scrolling. None is clipped by the viewport or a container, and none is covered by the HUD.
-- Scene labels sit inside the viewport, clear of the HUD and of each other.
+- Scene labels sit inside the viewport, clear of the HUD and of each other. Every objective stop's label is on screen, in place or edge-pinned with its arrow, at every audited stop.
 - At 960x540 and 1280x720, interaction, waypoint, footer and HUD buttons keep their labels on one line.
 - `npm ci && node test/ui-shots.mjs <loopback url> <outdir>` plays the whole game headless and fails on any of these, plus small hit targets and small text.
 - Hit targets are at least 44px.
