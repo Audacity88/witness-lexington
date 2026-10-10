@@ -1,4 +1,4 @@
-/* Witness the First Shot — 3D world: Lexington Green (refactored from witness.js v2.1 buildLexington)
+/* Witness Lexington — 3D world: Lexington Green (refactored from witness.js v2.1 buildLexington)
    and the low-poly globe (from witness.js v2.1's geographic transition). Classic script; needs
    window.THREE (three r186 + OrbitControls) and window.WG_COAST_B64. Defines window.WGWorld. */
 (function () {
@@ -175,14 +175,281 @@
       };
     }
 
-    // ---------- label sprite ----------
-    function labelSprite(text, bg, fg) {
-      var c = document.createElement('canvas'); c.width = 512; c.height = 96; var x = c.getContext('2d');
-      x.font = '700 44px system-ui,-apple-system,Segoe UI,Roboto,sans-serif'; var w = Math.min(500, x.measureText(text).width + 44);
-      x.fillStyle = bg || 'rgba(8,12,26,.78)'; x.beginPath(); if (x.roundRect) x.roundRect((512 - w) / 2, 10, w, 76, 22); else x.rect((512 - w) / 2, 10, w, 76); x.fill();
-      x.fillStyle = fg || '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 256, 50);
-      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace;
-      var sp = new T.Sprite(new T.SpriteMaterial({ map: t, depthTest: false, transparent: true, fog: false })); sp.renderOrder = 10; return sp;
+    // ---------- UI overlays drawn in the scene: cartouche labels and wax-seal stop markers (see UI_STYLE.md) ----------
+    var INK = '#241b12', PAPER = '#f3e9d2', RUBRIC = '#7e2219';
+    var TITLE_PX = 60, SUB_PX = 46;
+    var DISPLAY_FONT = '"IM Fell English SC","Libre Caslon Text",Georgia,serif', ITALIC_FONT = 'italic ' + SUB_PX + 'px "Libre Caslon Text",Georgia,serif';
+    var STOP_TODO = 0xc0473a;
+    function whenFontsReady(fn) {
+      if (!document.fonts || !document.fonts.load) return;
+      Promise.all([document.fonts.load('60px "IM Fell English SC"'), document.fonts.load(ITALIC_FONT)]).then(fn, function () {});
+    }
+    function cartouche(text) {
+      var parts = text.split(' · '), title = parts[0], sub = parts.slice(1).join(' · ');
+      var c = document.createElement('canvas'), x = c.getContext('2d'), titleFont = TITLE_PX + 'px ' + DISPLAY_FONT;
+      x.font = titleFont; var tw = x.measureText(title).width;
+      x.font = ITALIC_FONT; var sw = sub ? x.measureText(sub).width : 0;
+      var bw = Math.ceil(Math.max(tw, sw) + 96), bh = sub ? 138 : 88, n = 14, tail = 18, sh = 8;
+      c.width = bw + sh + 8; c.height = bh + tail + sh + 8; x = c.getContext('2d');
+      // Ticket outline with concave corners and a pointer that drops toward the marker.
+      function outline(ox, oy, inset, pointer) {
+        var l = 4 + ox + inset, t = 4 + oy + inset, r = 4 + ox + bw - inset, b = 4 + oy + bh - inset, k = n + inset, cx = (l + r) / 2;
+        x.beginPath(); x.moveTo(l + k, t); x.lineTo(r - k, t);
+        x.arc(r, t, k, Math.PI, Math.PI / 2, true); x.lineTo(r, b - k);
+        x.arc(r, b, k, Math.PI * 1.5, Math.PI, true);
+        if (pointer) { x.lineTo(cx + tail, b); x.lineTo(cx, b + tail); x.lineTo(cx - tail, b); }
+        x.lineTo(l + k, b); x.arc(l, b, k, 0, Math.PI * 1.5, true); x.lineTo(l, t + k);
+        x.arc(l, t, k, Math.PI / 2, 0, true); x.closePath();
+      }
+      outline(sh, sh, 0, true); x.fillStyle = 'rgba(20,14,8,.85)'; x.fill();
+      outline(0, 0, 0, true); x.fillStyle = PAPER; x.fill(); x.lineWidth = 5; x.strokeStyle = INK; x.stroke();
+      outline(0, 0, 9, false); x.lineWidth = 1.5; x.strokeStyle = 'rgba(36,27,18,.7)'; x.stroke();
+      var ty = 4 + (sub ? 50 : bh / 2 + 2);
+      [4 + 28, 4 + bw - 28].forEach(function (lx) {
+        x.beginPath(); x.moveTo(lx, ty - 7); x.lineTo(lx + 6, ty); x.lineTo(lx, ty + 7); x.lineTo(lx - 6, ty); x.closePath(); x.fillStyle = RUBRIC; x.fill();
+      });
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      // A same-colour stroke thickens the strokes so the text survives being scaled down to about a third.
+      x.lineJoin = 'round';
+      x.font = titleFont; x.fillStyle = INK; x.strokeStyle = INK; x.lineWidth = 1.5;
+      x.strokeText(title, 4 + bw / 2, ty); x.fillText(title, 4 + bw / 2, ty);
+      if (sub) {
+        x.font = ITALIC_FONT; x.fillStyle = RUBRIC; x.strokeStyle = RUBRIC; x.lineWidth = 2.5;
+        x.strokeText(sub, 4 + bw / 2, 4 + 104); x.fillText(sub, 4 + bw / 2, 4 + 104);
+      }
+      return c;
+    }
+    // Arrow (points up before rotation) for edge-pinned labels, and an ink leader with paper edges that ties a label to its seal.
+    function overlayTexture(w, h, draw) {
+      var c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'));
+      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; return t;
+    }
+    var ARROW_TEX = null, LEADER_TEX = null;
+    function overlaySprite(kind) {
+      if (!ARROW_TEX) {
+        ARROW_TEX = overlayTexture(64, 64, function (x) {
+          x.beginPath(); x.moveTo(32, 6); x.lineTo(58, 54); x.lineTo(32, 44); x.lineTo(6, 54); x.closePath();
+          x.lineJoin = 'round'; x.lineWidth = 10; x.strokeStyle = PAPER; x.stroke();
+          x.fillStyle = '#a8322a'; x.fill(); x.lineWidth = 4; x.strokeStyle = INK; x.stroke();
+        });
+        LEADER_TEX = overlayTexture(8, 4, function (x) { x.fillStyle = PAPER; x.fillRect(0, 0, 8, 4); x.fillStyle = INK; x.fillRect(2, 0, 4, 4); });
+      }
+      var sp = new T.Sprite(new T.SpriteMaterial({ map: kind === 'arrow' ? ARROW_TEX : LEADER_TEX, depthTest: false, transparent: true, fog: false }));
+      sp.renderOrder = kind === 'arrow' ? 11 : 9; sp.frustumCulled = false; sp.visible = false;
+      if (kind === 'leader') sp.center.set(0.5, 0);
+      return sp;
+    }
+    var LABELS = [];
+    // id names the stop for objective focus. seal is the object the label belongs to: it decides edge pinning and,
+    // unless noLeader is set, gets a leader line.
+    function labelSprite(text, id, seal, noLeader) {
+      var c = cartouche(text), t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace;
+      var sp = new T.Sprite(new T.SpriteMaterial({ map: t, depthTest: false, transparent: true, fog: false }));
+      sp.renderOrder = 10; sp.center.set(0.5, 0); sp.frustumCulled = false;
+      sp.userData.label = { text: text, id: id || null, seal: seal || null, sub: text.indexOf(' · ') >= 0, w: c.width, h: c.height,
+        arrow: overlaySprite('arrow'), leader: seal && !noLeader ? overlaySprite('leader') : null };
+      sp.add(sp.userData.label.arrow); if (sp.userData.label.leader) sp.add(sp.userData.label.leader);
+      sp.scale.set(c.width / c.height, 1, 1); LABELS.push(sp);
+      whenFontsReady(function () {
+        var next = cartouche(text), map = new T.CanvasTexture(next); map.colorSpace = T.SRGBColorSpace;
+        sp.material.map.dispose(); sp.material.map = map; sp.material.needsUpdate = true;
+        sp.userData.label.w = next.width; sp.userData.label.h = next.height;
+      });
+      return sp;
+    }
+    // Labels are laid out in screen space every frame (installed as scene.onBeforeRender, which runs after the
+    // matrix update and before culling). Each label keeps a fixed on-screen size so its text never drops below
+    // 14px and is kept inside the viewport, clear of the HUD rectangles reported by world.labelAvoid.
+    // Labels for the stops in world.labelFocus (the current objective) are placed first and never fade: in place
+    // while their seal is visible, otherwise pinned to the nearest edge of the safe band with an arrow toward the
+    // seal. Other labels follow nearest first and fade when their anchor is off screen or no nearby slot is free.
+    // A leader ties a label to its seal whenever the two are apart.
+    var lv = new T.Vector3(), lq = new T.Quaternion(), lsc = new T.Vector3(), lsz = new T.Vector2();
+    function labelOnScene(sp, scene) {
+      for (var o = sp; o; o = o.parent) { if (!o.visible) return false; if (o === scene) return true; }
+      return false;
+    }
+    function hits(a, b) { return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top; }
+    function inside(x, y, r) { return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }
+    function screenOf(v, camera, w, h) {
+      var depth = -v.clone().applyMatrix4(camera.matrixWorldInverse).z, p = v.clone().project(camera);
+      var x = (p.x + 1) / 2 * w, y = (1 - p.y) / 2 * h;
+      if (depth <= 0) { x = w - x; y = h - y; }
+      return { x: x, y: y, depth: depth };
+    }
+    // Positions a sprite so its centre point lands on screen pixel (x, y) at the given view depth, sized in pixels.
+    function placeOnScreen(sp, camera, w, h, x, y, depth, pw, ph, rotation) {
+      var P = camera.projectionMatrix.elements, d = Math.max(depth, camera.near * 4);
+      lv.set(((x / w) * 2 - 1) * d / P[0], (1 - (y / h) * 2) * d / P[5], -d).applyMatrix4(camera.matrixWorld);
+      var unit = 2 * d / P[5] / h;
+      if (rotation !== undefined) sp.material.rotation = rotation;
+      sp.matrixWorld.compose(lv, lq, lsc.set(pw * unit, ph * unit, 1));
+    }
+    function layoutLabels(renderer, scene, camera) {
+      renderer.getSize(lsz); var w = lsz.x, h = lsz.y, boxes = [];
+      world.labelBoxes = boxes;
+      if (!w || !h) return;
+      var pad = 6, gap = 4, arrowPx = Math.round(Math.max(22, h / 26)), focus = world.labelFocus || [];
+      var avoid = (world.labelAvoid && world.labelAvoid()) || [], placed = [], todo = [];
+      var titlePx = Math.max(18, Math.min(24, h / 30));
+      // The safe band runs between the HUD along the top and the panel along the bottom.
+      var band = { left: pad, right: w - pad, top: pad, bottom: h - pad };
+      avoid.forEach(function (r) {
+        if (r.top < h * 0.3) band.top = Math.max(band.top, r.bottom);
+        else if (r.bottom > h * 0.7) band.bottom = Math.min(band.bottom, r.top);
+      });
+      function blocked(p) { return p.x < 0 || p.x > w || p.y < 0 || p.y > h || avoid.some(function (r) { return inside(p.x, p.y, r); }); }
+      LABELS.forEach(function (sp) {
+        if (!labelOnScene(sp, scene)) return;
+        var L = sp.userData.label;
+        var a = screenOf(lv.copy(sp.position).applyMatrix4(sp.parent.matrixWorld), camera, w, h);
+        var seal = L.seal ? screenOf(L.seal.getWorldPosition(new T.Vector3()), camera, w, h) : null;
+        var t = seal || a, isFocus = L.id !== null && focus.indexOf(L.id) >= 0;
+        todo.push({ sp: sp, L: L, a: a, seal: seal, focus: isFocus, pin: isFocus && !(t.depth > 0 && !blocked(t)) });
+      });
+      // Edge-pinned labels have the fewest free slots, so they go first; in-place objective labels can move and keep a leader.
+      todo.sort(function (p, q) { return (q.pin - p.pin) || (q.focus - p.focus) || (p.a.depth - q.a.depth); });
+      todo.forEach(function (it) {
+        var L = it.L, s = Math.max(titlePx / TITLE_PX, L.sub ? 14 / SUB_PX : 0), pw = L.w * s, ph = L.h * s;
+        var a = it.a, target = it.seal || a, best = null, pinned = false, blockers = avoid.concat(placed);
+        var visible = a.depth > 0 && !blocked(a), targetOn = !it.pin;
+        function clampBox(left, top, r) {
+          r = r || { left: pad, right: w - pad, top: pad, bottom: h - pad };
+          left = Math.max(r.left, Math.min(r.right - pw, left)); top = Math.max(r.top, Math.min(r.bottom - ph, top));
+          return { left: left, top: top, right: left + pw, bottom: top + ph };
+        }
+        // Objective labels also try a grid over the given area, so they find the nearest free slot when crowded.
+        function search(want, limit, r, grid) {
+          var found = null, cands = [want], y, x;
+          if (!blockers.some(function (b) { return hits(want, b); })) return want;
+          if (grid) for (y = grid.top; y <= grid.bottom - ph; y += 6) for (x = grid.left; x <= grid.right - pw; x += 12) cands.push(clampBox(x, y, grid));
+          blockers.forEach(function (b) {
+            cands.push(clampBox(want.left, b.top - gap - ph, r), clampBox(want.left, b.bottom + gap, r),
+              clampBox(b.left - gap - pw, want.top, r), clampBox(b.right + gap, want.top, r));
+          });
+          cands.forEach(function (c) {
+            if (blockers.some(function (b) { return hits(c, b); })) return;
+            var d = Math.hypot(c.left - want.left, c.top - want.top);
+            if (d <= limit && (!found || d < found.d)) { found = c; found.d = d; }
+          });
+          return found;
+        }
+        if (it.focus && !targetOn) {
+          // Pin at the point of the safe band nearest the seal, with room for the arrow on the edge the seal lies beyond.
+          var r = { left: band.left, right: band.right, top: band.top, bottom: band.bottom }, room = arrowPx + gap;
+          var ox = Math.max(band.left - target.x, target.x - band.right, 0), oy = Math.max(band.top - target.y, target.y - band.bottom, 0);
+          pinned = ox >= oy ? (target.x < w / 2 ? 'left' : 'right') : (target.y < (band.top + band.bottom) / 2 ? 'top' : 'bottom');
+          r[pinned] += pinned === 'left' || pinned === 'top' ? room : -room;
+          var want = clampBox(target.x - pw / 2, target.y - ph / 2, r);
+          best = search(want, Infinity, r, r) || want;
+        } else if (visible || (it.focus && targetOn)) {
+          var wantHere = clampBox(a.x - pw / 2, a.y - ph);
+          best = it.focus ? search(wantHere, Infinity, null, band) || wantHere : search(wantHere, Math.max(2.5 * ph, 90));
+        }
+        var m = it.sp.material, shown = best ? 1 : 0;
+        m.opacity += (shown - m.opacity) * 0.5; if (Math.abs(shown - m.opacity) < 0.02) m.opacity = shown;
+        if (best) { placed.push(best); it.sp.userData.screen = { box: best, pinned: pinned, pw: pw, ph: ph }; }
+        var at = it.sp.userData.screen, arrow = L.arrow, leader = L.leader;
+        arrow.visible = false; if (leader) leader.visible = false;
+        if (!at || m.opacity === 0) { m.opacity = 0; return; }
+        var depth = a.depth > 0 ? a.depth : 10, b = at.box, bx = (b.left + b.right) / 2;
+        placeOnScreen(it.sp, camera, w, h, bx, b.bottom, depth, at.pw, at.ph);
+        var record = best ? { id: L.id, text: L.text, left: b.left, top: b.top, width: at.pw, height: at.ph,
+          titlePx: TITLE_PX * s, subPx: L.sub ? SUB_PX * s : null, focus: it.focus, pinned: !!at.pinned, edge: at.pinned || null, arrow: null, leader: null } : null;
+        if (at.pinned) {
+          // The arrow sits in the reserved room beside the label and turns to point at the seal.
+          var half = arrowPx / 2, side = at.pinned, ox, oy;
+          if (side === 'left' || side === 'right') {
+            ox = side === 'left' ? b.left - gap - half : b.right + gap + half;
+            oy = Math.max(b.top + half, Math.min(b.bottom - half, target.y));
+          } else {
+            oy = side === 'top' ? b.top - gap - half : b.bottom + gap + half;
+            ox = Math.max(b.left + half, Math.min(b.right - half, target.x));
+          }
+          var ux = target.x - ox, uy = target.y - oy, len = Math.hypot(ux, uy) || 1;
+          ux /= len; uy /= len;
+          arrow.visible = true; arrow.material.opacity = m.opacity;
+          placeOnScreen(arrow, camera, w, h, ox, oy, depth, arrowPx, arrowPx, Math.atan2(-uy, ux) - Math.PI / 2);
+          if (record) record.arrow = { x: ox, y: oy, dx: ux, dy: uy, size: arrowPx };
+        } else if (leader && it.seal && it.seal.depth > 0) {
+          // Leader from the seal's rim up to the label's pointer, drawn only when they are apart.
+          var sx = it.seal.x, sy = it.seal.y, lx = bx - sx, ly = b.bottom - sy, dist = Math.hypot(lx, ly);
+          var rim = Math.min(0.5 * 1.3 / it.seal.depth * camera.projectionMatrix.elements[5] * h / 2, dist);
+          if (dist - rim > 8) {
+            leader.visible = true; leader.material.opacity = m.opacity;
+            var px = sx + lx / dist * rim, py = sy + ly / dist * rim;
+            placeOnScreen(leader, camera, w, h, px, py, it.seal.depth, Math.max(4, h / 160), dist - rim, Math.atan2(-ly, lx) - Math.PI / 2);
+            if (record) record.leader = { x1: px, y1: py, x2: bx, y2: b.bottom };
+          }
+        }
+        if (record) boxes.push(record);
+      });
+    }
+    var SEALS = {};
+    function sealEmblem(x, kind) {
+      x.fillStyle = INK; x.strokeStyle = INK; x.lineCap = 'round'; x.lineJoin = 'round';
+      if (kind === 'quill') {
+        x.beginPath(); x.moveTo(86, 174); x.bezierCurveTo(98, 124, 136, 86, 184, 68); x.bezierCurveTo(178, 112, 142, 150, 96, 172); x.closePath(); x.fill();
+        x.strokeStyle = '#ffffff'; x.lineWidth = 3; x.beginPath(); x.moveTo(94, 166); x.quadraticCurveTo(134, 118, 178, 76); x.stroke();
+        x.strokeStyle = INK; x.lineWidth = 7; x.beginPath(); x.moveTo(88, 172); x.lineTo(70, 194); x.stroke();
+      } else if (kind === 'eye') {
+        x.lineWidth = 9; x.beginPath(); x.moveTo(62, 128); x.quadraticCurveTo(128, 70, 194, 128); x.quadraticCurveTo(128, 186, 62, 128); x.closePath(); x.stroke();
+        x.beginPath(); x.arc(128, 128, 20, 0, TAU); x.fill();
+      } else if (kind === 'house') {
+        x.beginPath(); x.moveTo(78, 124); x.lineTo(128, 80); x.lineTo(178, 124); x.closePath(); x.fill();
+        x.fillRect(90, 122, 76, 56); x.fillStyle = '#ffffff'; x.fillRect(118, 144, 20, 34);
+      } else if (kind === 'flag') {
+        x.lineWidth = 8; x.beginPath(); x.moveTo(98, 186); x.lineTo(98, 72); x.stroke();
+        x.beginPath(); x.moveTo(102, 74); x.lineTo(176, 98); x.lineTo(102, 124); x.closePath(); x.fill();
+      } else {
+        x.beginPath();
+        for (var i = 0; i < 10; i++) { var a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 22 : 52; x[i ? 'lineTo' : 'moveTo'](128 + Math.cos(a) * r, 128 + Math.sin(a) * r); }
+        x.closePath(); x.fill();
+      }
+    }
+    // An open seal has a white fill that the material tints wax red. A visited seal is painted parchment with a
+    // faded emblem and a check mark, so the state reads by shape as well as colour.
+    function sealTexture(kind, done) {
+      var key = kind + (done ? ':done' : '');
+      if (SEALS[key]) return SEALS[key];
+      var c = document.createElement('canvas'); c.width = c.height = 256; var x = c.getContext('2d');
+      x.beginPath();
+      for (var i = 0; i <= 72; i++) {
+        var a = i / 72 * TAU, r = 106 + Math.sin(a * 7) * 4 + Math.sin(a * 3 + 1) * 3;
+        x[i ? 'lineTo' : 'moveTo'](128 + Math.cos(a) * r, 128 + Math.sin(a) * r);
+      }
+      x.closePath(); x.fillStyle = done ? '#ece0c0' : '#ffffff'; x.fill(); x.lineWidth = 8; x.strokeStyle = INK; x.stroke();
+      x.globalAlpha = done ? 0.4 : 1;
+      x.beginPath(); x.arc(128, 128, 80, 0, TAU); x.lineWidth = 5; x.stroke();
+      if (x.setLineDash) x.setLineDash([7, 9]);
+      x.beginPath(); x.arc(128, 128, 92, 0, TAU); x.lineWidth = 3; x.stroke();
+      if (x.setLineDash) x.setLineDash([]);
+      x.globalAlpha = done ? 0.25 : 1; sealEmblem(x, kind); x.globalAlpha = 1;
+      if (done) {
+        x.lineCap = 'round'; x.lineJoin = 'round';
+        x.beginPath(); x.moveTo(74, 132); x.lineTo(112, 172); x.lineTo(186, 84);
+        x.strokeStyle = '#ece0c0'; x.lineWidth = 40; x.stroke();
+        x.strokeStyle = INK; x.lineWidth = 30; x.stroke();
+        x.strokeStyle = '#2f5e36'; x.lineWidth = 18; x.stroke();
+      }
+      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; SEALS[key] = t; return t;
+    }
+    var SEAL_KIND = { parsonage: 'star', lantern: 'house', orchard: 'house', parker: 'star', militia: 'star', town: 'star',
+      near: 'quill', far: 'quill', boundary: 'flag', corner: 'eye', edge: 'eye', shelter: 'house' };
+    function stopMarker(id) {
+      var kind = SEAL_KIND[id] || 'star', done = false;
+      var m = new T.Mesh(new T.PlaneGeometry(2.6, 2.6).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({
+        map: sealTexture(kind, false), color: STOP_TODO, transparent: true, depthWrite: false, fog: false
+      }));
+      m.renderOrder = 2;
+      Object.defineProperty(m, 'done', {
+        get: function () { return done; },
+        set: function (v) {
+          if (!!v === done) return; done = !!v;
+          m.material.map = sealTexture(kind, done); m.material.color.set(done ? 0xffffff : STOP_TODO);
+        }
+      });
+      return m;
     }
 
     // ======================= Lexington Green (instance) =======================
@@ -202,7 +469,7 @@
 
     function makeLex() {
       seed = 1775;                                      // identical layout for every instance
-      var scene = new T.Scene(); scene.fog = new T.Fog(0xe6b99c, 40, 190);
+      var scene = new T.Scene(); scene.fog = new T.Fog(0xe6b99c, 40, 190); scene.onBeforeRender = layoutLabels;
       var g = new T.Group(); scene.add(g);
       g.add(skyDome(0x3d4f7c, 0xd99a8a, 0xffc98f));
       var sunDir = new T.Vector3(-1, 0.12, -0.55);
@@ -548,14 +815,14 @@
 
     // WL-S1's fictional lane uses the same low-poly people and materials as the Green.
     function makeNight() {
-      var scene = new T.Scene(); scene.background = new T.Color(0x101e36);
+      var scene = new T.Scene(); scene.background = new T.Color(0x101e36); scene.onBeforeRender = layoutLabels;
       scene.fog = new T.Fog(0x101e36, 38, 105);
       var g = new T.Group(); scene.add(g);
       lights(g, 0xb4d5ff, 0x403d33, 1.6, 0xb4ceff, 2.1, new T.Vector3(-20, 35, 12), 55);
       g.add(mesh(new T.PlaneGeometry(130, 150).rotateX(-Math.PI / 2), mat(0x354c3c), false, true));
       var lane = mesh(new T.PlaneGeometry(5, 50).rotateX(-Math.PI / 2), mat(0x897a65), false, true);
       lane.position.set(0, 0.04, 23); g.add(lane);
-      function home(x, z, color, label) {
+      function home(x, z, color, label, id) {
         var h = new T.Group(); h.position.set(x, 0, z); g.add(h);
         var body = mesh(new T.BoxGeometry(6, 4, 5), mat(color), true, true); body.position.y = 2; h.add(body);
         var roof = mesh(gable(6.6, 5.8, 2), mat(0x34333b)); roof.position.y = 4; h.add(roof);
@@ -563,17 +830,17 @@
           var win = mesh(new T.BoxGeometry(0.8, 1, 0.12), mat(0xffd18b, { emissive: 0xc48130, emissiveIntensity: 0.8 }), false);
           win.position.set(wx, 2.1, 2.55); h.add(win);
         });
-        var sign = labelSprite(label, '#152238', '#ffdfa0'); sign.position.set(0, 7.1, 0); sign.scale.set(9, 1.4, 1); h.add(sign);
+        var sign = labelSprite(label, id, h, true); sign.position.set(0, 6.4, 0); h.add(sign);
       }
-      home(-8, 44, 0xb2a493, 'Parsonage · reconstruction');
-      home(-8, 28, 0x876c65, 'Lantern · fictional');
-      home(8, 10, 0x82929a, 'Orchard · fictional');
+      home(-8, 44, 0xb2a493, 'Parsonage · reconstruction', 'parsonage');
+      home(-8, 28, 0x876c65, 'Lantern · fictional', 'lantern');
+      home(8, 10, 0x82929a, 'Orchard · fictional', 'orchard');
       var residents = [], rings = [];
       [[-2.8, 44], [-2.8, 28], [2.8, 10]].forEach(function (p, i) {
         var resident = person({ coat: i ? 0x977870 : 0x4a667b, pants: 0x6c6558, hat: 'round', hatColor: 0x292e39 });
         resident.position.set(p[0], 0, p[1]); resident.rotation.y = i === 2 ? -Math.PI / 2 : Math.PI / 2;
         g.add(resident); residents.push(resident);
-        var ring = new T.Mesh(new T.RingGeometry(0.7, 1.05, 16).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffd18b }));
+        var ring = stopMarker(['parsonage', 'lantern', 'orchard'][i]);
         ring.position.set(0, 0.07, p[1]); g.add(ring); rings.push(ring);
       });
       for (var i = 0; i < 24; i++) {
@@ -601,9 +868,9 @@
       var g = new T.Group(); lex.scene.add(g);
       var rings = [];
       stops.forEach(function (s) {
-        var ring = new T.Mesh(new T.RingGeometry(0.7, 1.05, 16).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffd18b }));
+        var ring = stopMarker(s.id);
         ring.position.set(s.x, 0.12, s.z); g.add(ring); rings.push(ring);
-        var label = labelSprite(s.name); label.position.set(s.x, 3.4, s.z); label.scale.set(5.8, 0.9, 1); g.add(label);
+        var label = labelSprite(s.name, s.id, ring); label.position.set(s.x, 2.4, s.z); g.add(label);
         if (['parker', 'militia', 'town'].includes(s.id)) {
           var p = person({ coat: s.id === 'parker' ? 0x4a667b : 0x977870, pants: 0x6c6558, hat: 'round', hatColor: 0x292e39 });
           p.position.set(s.x, 0.05, s.z + 1.7); p.rotation.y = Math.PI; g.add(p);
@@ -637,7 +904,10 @@
           lex.fx.clear(); lex.militia.forEach(function (m) { m.visible = true; }); walkers.pose(x, z, dx, dz, time);
           walkers.rings.forEach(function (r, i) { r.visible = phase === 'shelter' ? stops[i].id === 'shelter' : phase === 'green'; });
           // Hide destination labels during observation so they cannot float through the obstruction.
-          walkers.group.children.forEach(function (c) { if (c.isSprite) c.visible = ['green', 'shelter'].includes(phase); });
+          // The shelter label waits for the shelter step so it never reads as a choice at the spot-choosing step.
+          walkers.group.children.forEach(function (c) {
+            if (c.isSprite) c.visible = phase === 'shelter' ? c.userData.label.id === 'shelter' : phase === 'green' && c.userData.label.id !== 'shelter';
+          });
           blocker.visible = phase === 'green-event' && t >= 6 && t < 10;
           if (phase === 'green-event') {
             time = t;
@@ -677,12 +947,14 @@
     }
     function project(v3, camera, w, h, out) { var p = v3.clone().project(camera || cam); out = out || {}; out.x = (p.x + 1) / 2 * w; out.y = (1 - p.y) / 2 * h; out.vis = p.z < 1; return out; }
 
-    return {
+    var world = {
       renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls,
       makeLex: makeLex, makeNight: makeNight, makeDawn: makeDawn, makeGreen: makeGreen, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
       globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; } },
-      pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3
+      pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3,
+      labelAvoid: null, labelFocus: [], labelBoxes: []
     };
+    return world;
   }
   window.WGWorld = { create: create };
 })();

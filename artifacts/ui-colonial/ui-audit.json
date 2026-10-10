@@ -1,0 +1,26 @@
+[
+  {
+    "size": "1280x720",
+    "failure": null,
+    "errors": [],
+    "external": [],
+    "problems": {},
+    "shots": 33
+  },
+  {
+    "size": "960x540",
+    "failure": null,
+    "errors": [],
+    "external": [],
+    "problems": {},
+    "shots": 33
+  },
+  {
+    "size": "662x418",
+    "failure": null,
+    "errors": [],
+    "external": [],
+    "problems": {},
+    "shots": 33
+  }
+]

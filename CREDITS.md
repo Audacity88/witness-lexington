@@ -61,6 +61,7 @@ WL-D1 corrects this register and defines replacement content; it does not alter 
 - Lexington Green low-poly scene and globe transition adapted from `workbench-forge` Witness History v2.1 (`buildLexington` + geographic transition).
 - three.js r186 + OrbitControls, bundled locally (no CDN).
 - Coastline data: Natural Earth 1:50m land (public domain).
+- UI typefaces, bundled locally as Latin subsets in `assets/fonts/` (no web-font requests): IM Fell English SC, the Fell Types digitally reproduced by Igino Marini, and Libre Caslon Text, copyright 2018 The Libre Caslon Text Project Authors (Pablo Impallari et al.), both under the SIL Open Font License 1.1 (`assets/fonts/OFL-IMFellEnglishSC.txt`, `assets/fonts/OFL-LibreCaslonText.txt`). The UI art direction is in `UI_STYLE.md`.
 
 ### WL-S3 displayed script register
 

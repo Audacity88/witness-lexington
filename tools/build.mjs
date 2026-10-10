@@ -1,6 +1,6 @@
 // Build the self-contained embeddable bundle.  node tools/build.mjs
 // Outputs (dist/):
-//   witness-game.bundle.js   checked-in THREE r186 + v2 scripts + CSS + Doolittle image + source register
+//   witness-game.bundle.js   checked-in THREE r186 + v2 scripts + CSS + subset UI fonts + Doolittle image + source register
 //   fence-gz.json            {title, html}: gzip+base64 inline loader (DecompressionStream -> <script>.text; no eval / blob URLs)
 //   fence-inline.json        {title, html}: plain inline <script> fallback (only if it fits the 1,000,000-byte doc limit)
 //   witness-game.html        standalone single file (the gz fence wrapped as a full page)
@@ -13,13 +13,25 @@ const three = rd('vendor/three-orbit.global.js');
 const files = [...rd('index.html').matchAll(/<script src="([^"]+)"/g)].map(m => m[1]).filter(f => f !== 'vendor/three-orbit.global.js');
 if (files.includes('src/game.js') || !files.includes('src/night-ride.js')) throw new Error('Expected the v2 entrypoint');
 const img = 'data:image/webp;base64,' + fs.readFileSync(path.join(ROOT, 'assets/doolittle-plate1.webp')).toString('base64');
-const css = rd('src/night-ride.css');
+// Fonts ship as FontFace objects built from bundled bytes: no font request, and no font-src needed under a strict CSP.
+const FONT_BLOCK = /\/\* @fonts-start[\s\S]*?@fonts-end \*\//;
+const cssSource = rd('src/night-ride.css');
+if (!FONT_BLOCK.test(cssSource)) throw new Error('Expected the @fonts-start/@fonts-end block in src/night-ride.css');
+const fontFaces = [...cssSource.match(FONT_BLOCK)[0].matchAll(/@font-face\s*\{([^}]*)\}/g)].map(m => {
+  const prop = k => (m[1].match(new RegExp(k + '\\s*:\\s*([^;]+);')) || [])[1];
+  const file = prop('src').match(/url\("\.\.\/([^"]+)"\)/)[1];
+  return [prop('font-family').replace(/"/g, ''), fs.readFileSync(path.join(ROOT, file)).toString('base64'), { weight: prop('font-weight'), style: prop('font-style'), display: 'swap' }];
+});
+const fontLoader = '(function(){if(!window.FontFace||!document.fonts)return;' + JSON.stringify(fontFaces) +
+  '.forEach(function(f){try{var b=atob(f[1]),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);var face=new FontFace(f[0],u.buffer,f[2]);document.fonts.add(face);face.load();}catch(e){}});})();\n';
+const css = cssSource.replace(FONT_BLOCK, '');
+if (/url\("\.\.\//.test(css)) throw new Error('CSS references a repo file that the bundle would request');
 const escape = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const sources = '<!doctype html><meta charset="utf-8"><title>Witness Lexington sources</title><pre style="white-space:pre-wrap">' + escape(rd('SOURCES.md') + '\n' + rd('CREDITS.md')) + '</pre>';
 const app = files.map(rd).join(';\n');
-const header = '/* Witness Lexington v2. THREE r186 MIT. Doolittle Plate I: Yale object 2482, CC0. */\n';
+const header = '/* Witness Lexington v2. THREE r186 MIT. Doolittle Plate I: Yale object 2482, CC0. IM Fell English SC and Libre Caslon Text: SIL OFL 1.1. */\n';
 const bundle = header + three + ';\nwindow.WG_DOOLITTLE_SRC=' + JSON.stringify(img) + ';\nwindow.WL_SOURCES_URL=URL.createObjectURL(new Blob([' + JSON.stringify(sources) + '],{type:"text/html"}));\n' +
-  '(function(){var s=document.createElement("style");s.textContent=' + JSON.stringify(css) + ';document.head.appendChild(s);})();\n' + app;
+  fontLoader + '(function(){var s=document.createElement("style");s.textContent=' + JSON.stringify(css) + ';document.head.appendChild(s);})();\n' + app;
 if (/fired two shots/i.test(bundle)) throw new Error('Barker overstatement in build');
 fs.writeFileSync(path.join(DIST, 'witness-game.bundle.js'), bundle);
 
@@ -49,7 +61,7 @@ fs.writeFileSync(path.join(DIST, 'witness-game-inline.html'), `<!doctype html><h
 const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:">`;
 fs.writeFileSync(path.join(ROOT, 'test/csp-gz.html'), rd('dist/witness-game.html').replace('<head>', '<head>' + csp));
 const B = s => Buffer.byteLength(s);
-const report = { entrypoint: files, threeBytes: B(three), imageDataUriBytes: B(img), appBytes: B(app), bundleBytes: B(bundle),
+const report = { entrypoint: files, threeBytes: B(three), imageDataUriBytes: B(img), fontBytes: B(fontLoader), cssBytes: B(css), appBytes: B(app), bundleBytes: B(bundle),
   bundleSha256: crypto.createHash('sha256').update(bundle).digest('hex'), gzFenceJsonBytes: B(gzJson), gzPayloadB64Bytes: gz.length,
   inlineFenceJsonBytes: B(inlineJson), inlineFits, rewriterMatches: 0, closeScriptInPayload: 0 };
 fs.writeFileSync(path.join(DIST, 'build-report.json'), JSON.stringify(report, null, 1));
