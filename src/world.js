@@ -177,7 +177,8 @@
 
     // ---------- UI overlays drawn in the scene: cartouche labels and wax-seal stop markers (see UI_STYLE.md) ----------
     var INK = '#241b12', PAPER = '#f3e9d2', RUBRIC = '#7e2219';
-    var DISPLAY_FONT = '"IM Fell English SC","Libre Caslon Text",Georgia,serif', ITALIC_FONT = 'italic 34px "Libre Caslon Text",Georgia,serif';
+    var TITLE_PX = 60, SUB_PX = 46;
+    var DISPLAY_FONT = '"IM Fell English SC","Libre Caslon Text",Georgia,serif', ITALIC_FONT = 'italic ' + SUB_PX + 'px "Libre Caslon Text",Georgia,serif';
     var STOP_TODO = 0xc0473a;
     function whenFontsReady(fn) {
       if (!document.fonts || !document.fonts.load) return;
@@ -185,10 +186,10 @@
     }
     function cartouche(text) {
       var parts = text.split(' · '), title = parts[0], sub = parts.slice(1).join(' · ');
-      var c = document.createElement('canvas'), x = c.getContext('2d'), titleFont = '60px ' + DISPLAY_FONT;
+      var c = document.createElement('canvas'), x = c.getContext('2d'), titleFont = TITLE_PX + 'px ' + DISPLAY_FONT;
       x.font = titleFont; var tw = x.measureText(title).width;
       x.font = ITALIC_FONT; var sw = sub ? x.measureText(sub).width : 0;
-      var bw = Math.ceil(Math.max(tw, sw) + 96), bh = sub ? 126 : 88, n = 14, tail = 18, sh = 8;
+      var bw = Math.ceil(Math.max(tw, sw) + 96), bh = sub ? 138 : 88, n = 14, tail = 18, sh = 8;
       c.width = bw + sh + 8; c.height = bh + tail + sh + 8; x = c.getContext('2d');
       // Ticket outline with concave corners and a pointer that drops toward the marker.
       function outline(ox, oy, inset, pointer) {
@@ -208,23 +209,89 @@
         x.beginPath(); x.moveTo(lx, ty - 7); x.lineTo(lx + 6, ty); x.lineTo(lx, ty + 7); x.lineTo(lx - 6, ty); x.closePath(); x.fillStyle = RUBRIC; x.fill();
       });
       x.textAlign = 'center'; x.textBaseline = 'middle';
-      x.font = titleFont; x.fillStyle = INK; x.fillText(title, 4 + bw / 2, ty);
-      if (sub) { x.font = ITALIC_FONT; x.fillStyle = RUBRIC; x.fillText(sub, 4 + bw / 2, 4 + 96); }
+      // A same-colour stroke thickens the strokes so the text survives being scaled down to about a third.
+      x.lineJoin = 'round';
+      x.font = titleFont; x.fillStyle = INK; x.strokeStyle = INK; x.lineWidth = 1.5;
+      x.strokeText(title, 4 + bw / 2, ty); x.fillText(title, 4 + bw / 2, ty);
+      if (sub) {
+        x.font = ITALIC_FONT; x.fillStyle = RUBRIC; x.strokeStyle = RUBRIC; x.lineWidth = 2.5;
+        x.strokeText(sub, 4 + bw / 2, 4 + 104); x.fillText(sub, 4 + bw / 2, 4 + 104);
+      }
       return c;
     }
-    function fitLabel(sp, height) {
-      sp.userData.height = height; sp.scale.set(height * sp.userData.aspect, height, 1); return sp;
-    }
+    var LABELS = [];
     function labelSprite(text) {
       var c = cartouche(text), t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace;
       var sp = new T.Sprite(new T.SpriteMaterial({ map: t, depthTest: false, transparent: true, fog: false }));
-      sp.renderOrder = 10; sp.center.set(0.5, 0); sp.userData.aspect = c.width / c.height; fitLabel(sp, 1);
+      sp.renderOrder = 10; sp.center.set(0.5, 0); sp.frustumCulled = false;
+      sp.userData.label = { text: text, sub: text.indexOf(' · ') >= 0, w: c.width, h: c.height };
+      sp.scale.set(c.width / c.height, 1, 1); LABELS.push(sp);
       whenFontsReady(function () {
         var next = cartouche(text), map = new T.CanvasTexture(next); map.colorSpace = T.SRGBColorSpace;
         sp.material.map.dispose(); sp.material.map = map; sp.material.needsUpdate = true;
-        sp.userData.aspect = next.width / next.height; fitLabel(sp, sp.userData.height);
+        sp.userData.label.w = next.width; sp.userData.label.h = next.height;
       });
       return sp;
+    }
+    // Labels are laid out in screen space every frame (installed as scene.onBeforeRender, which runs after the
+    // matrix update and before culling). Each label keeps a fixed on-screen size so its text never drops below
+    // 14px, is clamped inside the viewport clear of the HUD rectangles reported by world.labelAvoid, steps around
+    // labels already placed (nearest first), and fades out when its anchor is off screen or no nearby slot is free.
+    var lv = new T.Vector3(), lq = new T.Quaternion(), lsc = new T.Vector3(), lsz = new T.Vector2();
+    function labelOnScene(sp, scene) {
+      for (var o = sp; o; o = o.parent) { if (!o.visible) return false; if (o === scene) return true; }
+      return false;
+    }
+    function hits(a, b) { return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top; }
+    function layoutLabels(renderer, scene, camera) {
+      renderer.getSize(lsz); var w = lsz.x, h = lsz.y, boxes = [];
+      world.labelBoxes = boxes;
+      if (!w || !h) return;
+      var pad = 6, gap = 4, avoid = (world.labelAvoid && world.labelAvoid()) || [], placed = [], todo = [];
+      var titlePx = Math.max(18, Math.min(24, h / 30));
+      LABELS.forEach(function (sp) {
+        if (!labelOnScene(sp, scene)) return;
+        lv.copy(sp.position).applyMatrix4(sp.parent.matrixWorld);
+        var depth = -lv.clone().applyMatrix4(camera.matrixWorldInverse).z;
+        lv.project(camera);
+        todo.push({ sp: sp, ndc: lv.clone(), depth: depth });
+      });
+      todo.sort(function (a, b) { return a.depth - b.depth; });
+      todo.forEach(function (it) {
+        var L = it.sp.userData.label, s = Math.max(titlePx / TITLE_PX, L.sub ? 14 / SUB_PX : 0);
+        var pw = L.w * s, ph = L.h * s, ax = (it.ndc.x + 1) / 2 * w, ay = (1 - it.ndc.y) / 2 * h;
+        var anchor = { left: ax, right: ax, top: ay, bottom: ay }, best = null;
+        var onScreen = it.depth > 0 && Math.abs(it.ndc.z) <= 1 && ax >= 0 && ax <= w && ay >= 0 && ay <= h &&
+          !avoid.some(function (r) { return hits(anchor, r); });
+        if (onScreen) {
+          var clampBox = function (left, top) {
+            left = Math.max(pad, Math.min(w - pad - pw, left)); top = Math.max(pad, Math.min(h - pad - ph, top));
+            return { left: left, top: top, right: left + pw, bottom: top + ph };
+          };
+          var want = clampBox(ax - pw / 2, ay - ph), cands = [want], blockers = avoid.concat(placed);
+          blockers.forEach(function (r) {
+            cands.push(clampBox(want.left, r.top - gap - ph), clampBox(want.left, r.bottom + gap),
+              clampBox(r.left - gap - pw, want.top), clampBox(r.right + gap, want.top));
+          });
+          var limit = Math.max(2.5 * ph, 90);
+          cands.forEach(function (c) {
+            if (blockers.some(function (r) { return hits(c, r); })) return;
+            var d = Math.hypot(c.left - want.left, c.top - want.top) + Math.hypot(c.left + pw / 2 - ax, c.bottom - ay) * 0.25;
+            if (d <= limit && (!best || d < best.d)) { best = c; best.d = d; }
+          });
+        }
+        var m = it.sp.material, target = best ? 1 : 0;
+        m.opacity += (target - m.opacity) * 0.5; if (Math.abs(target - m.opacity) < 0.02) m.opacity = target;
+        if (best) {
+          placed.push(best); it.sp.userData.screen = best;
+          boxes.push({ text: L.text, left: best.left, top: best.top, width: pw, height: ph, titlePx: TITLE_PX * s, subPx: L.sub ? SUB_PX * s : null });
+        }
+        var at = it.sp.userData.screen;
+        if (!at || it.depth <= 0) { m.opacity = 0; return; }
+        lv.set((at.left + pw / 2) / w * 2 - 1, 1 - at.bottom / h * 2, it.ndc.z).unproject(camera);
+        var worldH = ph / h * 2 * it.depth / camera.projectionMatrix.elements[5];
+        it.sp.matrixWorld.compose(lv, lq, lsc.set(worldH * pw / ph, worldH, 1));
+      });
     }
     var SEALS = {};
     function sealEmblem(x, kind) {
@@ -310,7 +377,7 @@
 
     function makeLex() {
       seed = 1775;                                      // identical layout for every instance
-      var scene = new T.Scene(); scene.fog = new T.Fog(0xe6b99c, 40, 190);
+      var scene = new T.Scene(); scene.fog = new T.Fog(0xe6b99c, 40, 190); scene.onBeforeRender = layoutLabels;
       var g = new T.Group(); scene.add(g);
       g.add(skyDome(0x3d4f7c, 0xd99a8a, 0xffc98f));
       var sunDir = new T.Vector3(-1, 0.12, -0.55);
@@ -656,7 +723,7 @@
 
     // WL-S1's fictional lane uses the same low-poly people and materials as the Green.
     function makeNight() {
-      var scene = new T.Scene(); scene.background = new T.Color(0x101e36);
+      var scene = new T.Scene(); scene.background = new T.Color(0x101e36); scene.onBeforeRender = layoutLabels;
       scene.fog = new T.Fog(0x101e36, 38, 105);
       var g = new T.Group(); scene.add(g);
       lights(g, 0xb4d5ff, 0x403d33, 1.6, 0xb4ceff, 2.1, new T.Vector3(-20, 35, 12), 55);
@@ -671,7 +738,7 @@
           var win = mesh(new T.BoxGeometry(0.8, 1, 0.12), mat(0xffd18b, { emissive: 0xc48130, emissiveIntensity: 0.8 }), false);
           win.position.set(wx, 2.1, 2.55); h.add(win);
         });
-        var sign = fitLabel(labelSprite(label), 1.6); sign.position.set(0, 6.4, 0); h.add(sign);
+        var sign = labelSprite(label); sign.position.set(0, 6.4, 0); h.add(sign);
       }
       home(-8, 44, 0xb2a493, 'Parsonage · reconstruction');
       home(-8, 28, 0x876c65, 'Lantern · fictional');
@@ -711,7 +778,7 @@
       stops.forEach(function (s) {
         var ring = stopMarker(s.id);
         ring.position.set(s.x, 0.12, s.z); g.add(ring); rings.push(ring);
-        var label = fitLabel(labelSprite(s.name), s.name.indexOf(' · ') < 0 ? 0.95 : 1.35); label.position.set(s.x, 2.9, s.z); g.add(label);
+        var label = labelSprite(s.name); label.position.set(s.x, 2.9, s.z); g.add(label);
         if (['parker', 'militia', 'town'].includes(s.id)) {
           var p = person({ coat: s.id === 'parker' ? 0x4a667b : 0x977870, pants: 0x6c6558, hat: 'round', hatColor: 0x292e39 });
           p.position.set(s.x, 0.05, s.z + 1.7); p.rotation.y = Math.PI; g.add(p);
@@ -785,12 +852,14 @@
     }
     function project(v3, camera, w, h, out) { var p = v3.clone().project(camera || cam); out = out || {}; out.x = (p.x + 1) / 2 * w; out.y = (1 - p.y) / 2 * h; out.vis = p.z < 1; return out; }
 
-    return {
+    var world = {
       renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls,
       makeLex: makeLex, makeNight: makeNight, makeDawn: makeDawn, makeGreen: makeGreen, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
       globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; } },
-      pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3
+      pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3,
+      labelAvoid: null, labelBoxes: []
     };
+    return world;
   }
   window.WGWorld = { create: create };
 })();

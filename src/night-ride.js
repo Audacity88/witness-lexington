@@ -402,6 +402,14 @@
     state: function () { return state; }, target: function () { return target; }, setTarget: function (t) { target = t; },
     elapsed: function () { return elapsed; }, tick: function (dt) { elapsed += dt; }
   });
+  // Scene labels are laid out clear of the brand plate, HUD buttons and bottom panel.
+  W.labelAvoid = function () {
+    var o = W.canvas.getBoundingClientRect();
+    return [brand, tools, panel].filter(function (n) { return !n.hidden && n.getClientRects().length; }).map(function (n) {
+      var r = n.getBoundingClientRect();
+      return { left: r.left - o.left - 4, top: r.top - o.top - 4, right: r.right - o.left + 8, bottom: r.bottom - o.top + 8 };
+    });
+  };
   new ResizeObserver(resize).observe(host); resize(); render();
   function frame(now) {
     var dt = Math.max(0, (now - last) / 1000), moveDt = Math.min(0.05, dt); last = now;
@@ -473,6 +481,6 @@
     requestAnimationFrame(frame);
   }
   // Read-only snapshot for reviewer diagnostics. No scene seeking or source-scoring bypass.
-  window.WitnessGame = { snapshot: function () { return JSON.parse(JSON.stringify({ run: state, paused: paused, elapsed: elapsed, assisted: !!target, storageOK: storageOK, dialog: dialog.open })); } };
+  window.WitnessGame = { snapshot: function () { return JSON.parse(JSON.stringify({ run: state, paused: paused, elapsed: elapsed, assisted: !!target, storageOK: storageOK, dialog: dialog.open, labels: W.labelBoxes || [] })); } };
   requestAnimationFrame(frame);
 })();
