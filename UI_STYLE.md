@@ -87,15 +87,17 @@ Every surface the student reads uses one frame:
 
 ### Captions, objectives, and subtitles: the bottom strip
 
-- A broadside panel docked to the bottom, at most 1080px wide and centred, with at most 48% of the height.
-- The objective sentence is first. Then the primary interaction button (wax) and its status text in italic, then waypoint buttons that scroll when they overflow, then the save notice in italic.
-- The primary interaction button is never pushed off-screen, and only the waypoint row scrolls.
+- A broadside panel docked to the bottom, at most 1080px wide and centred. It grows to fit its content and never needs to scroll.
+- The objective sentence is first. Then the primary interaction button (wax) and its status text in italic, then the waypoint buttons, then the save notice in italic.
+- Waypoint buttons wrap into rows, so every waypoint is on screen at once and none is clipped. On short screens they form a grid of up to three columns, and a long waypoint name may wrap to two lines inside its 44px button. Nothing hides off to the side in a scroller.
+- The primary interaction button keeps its label on one line and is never pushed off-screen.
 - **Caption mode** applies to the opening cutscene and the Green observation. It is a narrower centred strip with the caption in Caslon italic at 19px (16px on short screens) and source tags as rubric. "Skip to rewind" or "Move to shelter" sits on the right. It reads like the caption beneath an engraving.
 
 ### Overlay cards: story beats, checkpoints, and pause
 
 - A centred broadside panel 640px wide at most. The kicker sits above the title as italic rubric after a hairline rule, the title in IM Fell SC, then the body.
 - Every card is split into a scrolling body and a fixed action footer (`.card-scroll` and `.card-actions`). That keeps the primary action visible without scrolling at 662x418, 960x540, and 1280x720. The footer is a `--paper-lo` band under a double ink rule.
+- Footer buttons size to their label and share rows when they fit. At 960x540 and larger, a label never wraps: a long one takes the full row instead. Short screens may wrap a label to two lines.
 
 ### Intro and title
 
@@ -122,7 +124,10 @@ Every surface the student reads uses one frame:
 
 - Canvas sprites drawn as engraved-map cartouches: a parchment ticket with concave corners, a 5px ink border, a fine inner rule, a hard ink shadow, red lozenges either side of the name, and a small pointer that drops to the marker below.
 - The name is set in IM Fell SC. Text after a " · " separator, such as "fictional" or "reconstruction", goes on a second line in rubric italic. The text itself is unchanged.
-- Each canvas is sized to its text, so labels never clip, and sprite scale keeps the canvas aspect ratio.
+- Each canvas is sized to its text, and the text carries a same-colour stroke so it stays solid when scaled down.
+- Labels keep a fixed size on screen rather than shrinking with distance. The name is at least 18px (up to 24px on tall screens), and the second line is at least 14px.
+- Every frame, labels are laid out in screen space, nearest first. Each is clamped inside the viewport and kept clear of the brand plate, the HUD buttons, the bottom strip and labels already placed. If its spot is taken, it steps just above, below or beside the obstacle.
+- A label fades out when its anchor is off screen or under the HUD, or when no free spot is close to its marker. The waypoint buttons still name every stop, so nothing is lost.
 - Labels redraw once the bundled fonts finish loading.
 
 ### Stop and listening-spot markers: wax seals
@@ -133,7 +138,7 @@ Every surface the student reads uses one frame:
   - Star: people to talk with.
   - House: households and shelter.
   - Pennant: the spectator boundary.
-- Unvisited stops are wax red. Visited stops fade to plain parchment with the emblem still inked, which is a large change in brightness as well as hue.
+- Unvisited stops are wax red with a solid ink emblem. A visited stop becomes a parchment seal: its rings and emblem fade to a ghost, and a large green check mark with an ink outline is stamped over it. The state reads from shape and brightness as well as hue.
 - Markers ignore fog so they stay legible at night.
 
 ### Notebook
@@ -169,7 +174,10 @@ Every surface the student reads uses one frame:
 
 Three sizes are the contract: 662x418 (the embed widget), 960x540, and 1280x720. At each size:
 
-- The HUD, the bottom strip's primary button, and every card's action footer are fully visible without scrolling.
+- The HUD, the bottom strip's primary button, every waypoint button, and every card's action footer are fully visible without scrolling. None is clipped by the viewport or a container, and none is covered by the HUD.
+- Scene labels sit inside the viewport, clear of the HUD and of each other.
+- At 960x540 and 1280x720, interaction, waypoint, footer and HUD buttons keep their labels on one line.
+- `npm ci && node test/ui-shots.mjs <loopback url> <outdir>` plays the whole game headless and fails on any of these, plus small hit targets and small text.
 - Hit targets are at least 44px.
 - Body text is at least 14px.
 
