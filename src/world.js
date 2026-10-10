@@ -175,14 +175,103 @@
       };
     }
 
-    // ---------- label sprite ----------
-    function labelSprite(text, bg, fg) {
-      var c = document.createElement('canvas'); c.width = 512; c.height = 96; var x = c.getContext('2d');
-      x.font = '700 44px system-ui,-apple-system,Segoe UI,Roboto,sans-serif'; var w = Math.min(500, x.measureText(text).width + 44);
-      x.fillStyle = bg || 'rgba(8,12,26,.78)'; x.beginPath(); if (x.roundRect) x.roundRect((512 - w) / 2, 10, w, 76, 22); else x.rect((512 - w) / 2, 10, w, 76); x.fill();
-      x.fillStyle = fg || '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 256, 50);
-      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace;
-      var sp = new T.Sprite(new T.SpriteMaterial({ map: t, depthTest: false, transparent: true, fog: false })); sp.renderOrder = 10; return sp;
+    // ---------- UI overlays drawn in the scene: cartouche labels and wax-seal stop markers (see UI_STYLE.md) ----------
+    var INK = '#241b12', PAPER = '#f3e9d2', RUBRIC = '#7e2219';
+    var DISPLAY_FONT = '"IM Fell English SC","Libre Caslon Text",Georgia,serif', ITALIC_FONT = 'italic 34px "Libre Caslon Text",Georgia,serif';
+    var STOP_TODO = 0xc0473a;
+    function whenFontsReady(fn) {
+      if (!document.fonts || !document.fonts.load) return;
+      Promise.all([document.fonts.load('60px "IM Fell English SC"'), document.fonts.load(ITALIC_FONT)]).then(fn, function () {});
+    }
+    function cartouche(text) {
+      var parts = text.split(' · '), title = parts[0], sub = parts.slice(1).join(' · ');
+      var c = document.createElement('canvas'), x = c.getContext('2d'), titleFont = '60px ' + DISPLAY_FONT;
+      x.font = titleFont; var tw = x.measureText(title).width;
+      x.font = ITALIC_FONT; var sw = sub ? x.measureText(sub).width : 0;
+      var bw = Math.ceil(Math.max(tw, sw) + 96), bh = sub ? 126 : 88, n = 14, tail = 18, sh = 8;
+      c.width = bw + sh + 8; c.height = bh + tail + sh + 8; x = c.getContext('2d');
+      // Ticket outline with concave corners and a pointer that drops toward the marker.
+      function outline(ox, oy, inset, pointer) {
+        var l = 4 + ox + inset, t = 4 + oy + inset, r = 4 + ox + bw - inset, b = 4 + oy + bh - inset, k = n + inset, cx = (l + r) / 2;
+        x.beginPath(); x.moveTo(l + k, t); x.lineTo(r - k, t);
+        x.arc(r, t, k, Math.PI, Math.PI / 2, true); x.lineTo(r, b - k);
+        x.arc(r, b, k, Math.PI * 1.5, Math.PI, true);
+        if (pointer) { x.lineTo(cx + tail, b); x.lineTo(cx, b + tail); x.lineTo(cx - tail, b); }
+        x.lineTo(l + k, b); x.arc(l, b, k, 0, Math.PI * 1.5, true); x.lineTo(l, t + k);
+        x.arc(l, t, k, Math.PI / 2, 0, true); x.closePath();
+      }
+      outline(sh, sh, 0, true); x.fillStyle = 'rgba(20,14,8,.85)'; x.fill();
+      outline(0, 0, 0, true); x.fillStyle = PAPER; x.fill(); x.lineWidth = 5; x.strokeStyle = INK; x.stroke();
+      outline(0, 0, 9, false); x.lineWidth = 1.5; x.strokeStyle = 'rgba(36,27,18,.7)'; x.stroke();
+      var ty = 4 + (sub ? 50 : bh / 2 + 2);
+      [4 + 28, 4 + bw - 28].forEach(function (lx) {
+        x.beginPath(); x.moveTo(lx, ty - 7); x.lineTo(lx + 6, ty); x.lineTo(lx, ty + 7); x.lineTo(lx - 6, ty); x.closePath(); x.fillStyle = RUBRIC; x.fill();
+      });
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.font = titleFont; x.fillStyle = INK; x.fillText(title, 4 + bw / 2, ty);
+      if (sub) { x.font = ITALIC_FONT; x.fillStyle = RUBRIC; x.fillText(sub, 4 + bw / 2, 4 + 96); }
+      return c;
+    }
+    function fitLabel(sp, height) {
+      sp.userData.height = height; sp.scale.set(height * sp.userData.aspect, height, 1); return sp;
+    }
+    function labelSprite(text) {
+      var c = cartouche(text), t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace;
+      var sp = new T.Sprite(new T.SpriteMaterial({ map: t, depthTest: false, transparent: true, fog: false }));
+      sp.renderOrder = 10; sp.center.set(0.5, 0); sp.userData.aspect = c.width / c.height; fitLabel(sp, 1);
+      whenFontsReady(function () {
+        var next = cartouche(text), map = new T.CanvasTexture(next); map.colorSpace = T.SRGBColorSpace;
+        sp.material.map.dispose(); sp.material.map = map; sp.material.needsUpdate = true;
+        sp.userData.aspect = next.width / next.height; fitLabel(sp, sp.userData.height);
+      });
+      return sp;
+    }
+    var SEALS = {};
+    function sealEmblem(x, kind) {
+      x.fillStyle = INK; x.strokeStyle = INK; x.lineCap = 'round'; x.lineJoin = 'round';
+      if (kind === 'quill') {
+        x.beginPath(); x.moveTo(86, 174); x.bezierCurveTo(98, 124, 136, 86, 184, 68); x.bezierCurveTo(178, 112, 142, 150, 96, 172); x.closePath(); x.fill();
+        x.strokeStyle = '#ffffff'; x.lineWidth = 3; x.beginPath(); x.moveTo(94, 166); x.quadraticCurveTo(134, 118, 178, 76); x.stroke();
+        x.strokeStyle = INK; x.lineWidth = 7; x.beginPath(); x.moveTo(88, 172); x.lineTo(70, 194); x.stroke();
+      } else if (kind === 'eye') {
+        x.lineWidth = 9; x.beginPath(); x.moveTo(62, 128); x.quadraticCurveTo(128, 70, 194, 128); x.quadraticCurveTo(128, 186, 62, 128); x.closePath(); x.stroke();
+        x.beginPath(); x.arc(128, 128, 20, 0, TAU); x.fill();
+      } else if (kind === 'house') {
+        x.beginPath(); x.moveTo(78, 124); x.lineTo(128, 80); x.lineTo(178, 124); x.closePath(); x.fill();
+        x.fillRect(90, 122, 76, 56); x.fillStyle = '#ffffff'; x.fillRect(118, 144, 20, 34);
+      } else if (kind === 'flag') {
+        x.lineWidth = 8; x.beginPath(); x.moveTo(98, 186); x.lineTo(98, 72); x.stroke();
+        x.beginPath(); x.moveTo(102, 74); x.lineTo(176, 98); x.lineTo(102, 124); x.closePath(); x.fill();
+      } else {
+        x.beginPath();
+        for (var i = 0; i < 10; i++) { var a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 22 : 52; x[i ? 'lineTo' : 'moveTo'](128 + Math.cos(a) * r, 128 + Math.sin(a) * r); }
+        x.closePath(); x.fill();
+      }
+    }
+    // White fill takes the material colour, so callers tint unvisited seals wax red and visited ones parchment.
+    function sealTexture(kind) {
+      if (SEALS[kind]) return SEALS[kind];
+      var c = document.createElement('canvas'); c.width = c.height = 256; var x = c.getContext('2d');
+      x.beginPath();
+      for (var i = 0; i <= 72; i++) {
+        var a = i / 72 * TAU, r = 106 + Math.sin(a * 7) * 4 + Math.sin(a * 3 + 1) * 3;
+        x[i ? 'lineTo' : 'moveTo'](128 + Math.cos(a) * r, 128 + Math.sin(a) * r);
+      }
+      x.closePath(); x.fillStyle = '#ffffff'; x.fill(); x.lineWidth = 8; x.strokeStyle = INK; x.stroke();
+      x.beginPath(); x.arc(128, 128, 80, 0, TAU); x.lineWidth = 5; x.stroke();
+      if (x.setLineDash) x.setLineDash([7, 9]);
+      x.beginPath(); x.arc(128, 128, 92, 0, TAU); x.lineWidth = 3; x.stroke();
+      if (x.setLineDash) x.setLineDash([]);
+      sealEmblem(x, kind);
+      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; SEALS[kind] = t; return t;
+    }
+    var SEAL_KIND = { parsonage: 'star', lantern: 'house', orchard: 'house', parker: 'star', militia: 'star', town: 'star',
+      near: 'quill', far: 'quill', boundary: 'flag', corner: 'eye', edge: 'eye', shelter: 'house' };
+    function stopMarker(id) {
+      var m = new T.Mesh(new T.PlaneGeometry(2.6, 2.6).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({
+        map: sealTexture(SEAL_KIND[id] || 'star'), color: STOP_TODO, transparent: true, depthWrite: false, fog: false
+      }));
+      m.renderOrder = 2; return m;
     }
 
     // ======================= Lexington Green (instance) =======================
@@ -563,7 +652,7 @@
           var win = mesh(new T.BoxGeometry(0.8, 1, 0.12), mat(0xffd18b, { emissive: 0xc48130, emissiveIntensity: 0.8 }), false);
           win.position.set(wx, 2.1, 2.55); h.add(win);
         });
-        var sign = labelSprite(label, '#152238', '#ffdfa0'); sign.position.set(0, 7.1, 0); sign.scale.set(9, 1.4, 1); h.add(sign);
+        var sign = fitLabel(labelSprite(label), 1.6); sign.position.set(0, 6.4, 0); h.add(sign);
       }
       home(-8, 44, 0xb2a493, 'Parsonage · reconstruction');
       home(-8, 28, 0x876c65, 'Lantern · fictional');
@@ -573,7 +662,7 @@
         var resident = person({ coat: i ? 0x977870 : 0x4a667b, pants: 0x6c6558, hat: 'round', hatColor: 0x292e39 });
         resident.position.set(p[0], 0, p[1]); resident.rotation.y = i === 2 ? -Math.PI / 2 : Math.PI / 2;
         g.add(resident); residents.push(resident);
-        var ring = new T.Mesh(new T.RingGeometry(0.7, 1.05, 16).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffd18b }));
+        var ring = stopMarker(['parsonage', 'lantern', 'orchard'][i]);
         ring.position.set(0, 0.07, p[1]); g.add(ring); rings.push(ring);
       });
       for (var i = 0; i < 24; i++) {
@@ -601,9 +690,9 @@
       var g = new T.Group(); lex.scene.add(g);
       var rings = [];
       stops.forEach(function (s) {
-        var ring = new T.Mesh(new T.RingGeometry(0.7, 1.05, 16).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffd18b }));
+        var ring = stopMarker(s.id);
         ring.position.set(s.x, 0.12, s.z); g.add(ring); rings.push(ring);
-        var label = labelSprite(s.name); label.position.set(s.x, 3.4, s.z); label.scale.set(5.8, 0.9, 1); g.add(label);
+        var label = fitLabel(labelSprite(s.name), s.name.indexOf(' · ') < 0 ? 0.95 : 1.35); label.position.set(s.x, 2.9, s.z); g.add(label);
         if (['parker', 'militia', 'town'].includes(s.id)) {
           var p = person({ coat: s.id === 'parker' ? 0x4a667b : 0x977870, pants: 0x6c6558, hat: 'round', hatColor: 0x292e39 });
           p.position.set(s.x, 0.05, s.z + 1.7); p.rotation.y = Math.PI; g.add(p);
