@@ -1,14 +1,24 @@
 {
- "threeNames": 39,
- "threeMinBytes": 604971,
+ "entrypoint": [
+  "src/world.js",
+  "data/night-ride.js",
+  "data/dawn-muster.js",
+  "data/evidence.js",
+  "data/essay-rules.js",
+  "data/green.js",
+  "src/evidence-check.js",
+  "src/green-essay.js",
+  "src/night-ride.js"
+ ],
+ "threeBytes": 763438,
  "imageDataUriBytes": 121823,
- "appMinBytes": 171076,
- "bundleBytes": 898069,
- "bundleSha256": "41e8b40c657cafdbc315a151955c9c9a9e832dbf7a6331bfecedd9b014f94d24",
- "gzFenceJsonBytes": 444960,
- "gzPayloadB64Bytes": 444244,
- "inlineFenceJsonBytes": 913623,
- "inlineFits": true,
+ "appBytes": 152967,
+ "bundleBytes": 1073570,
+ "bundleSha256": "fdb60421c9a16b88f37239eaca4aa1651f6fce958ebd273b9b576fb0b34442b0",
+ "gzFenceJsonBytes": 461150,
+ "gzPayloadB64Bytes": 460436,
+ "inlineFenceJsonBytes": 1090325,
+ "inlineFits": false,
  "rewriterMatches": 0,
  "closeScriptInPayload": 0
 }

@@ -546,6 +546,125 @@
       globe.updateMatrixWorld(true); var wp = new T.Vector3(); pin.getWorldPosition(wp); pinLab.visible = wp.z > 0.25 && far > 0.01; pinDot.visible = wp.z > 0;
     }
 
+    // WL-S1's fictional lane uses the same low-poly people and materials as the Green.
+    function makeNight() {
+      var scene = new T.Scene(); scene.background = new T.Color(0x101e36);
+      scene.fog = new T.Fog(0x101e36, 38, 105);
+      var g = new T.Group(); scene.add(g);
+      lights(g, 0xb4d5ff, 0x403d33, 1.6, 0xb4ceff, 2.1, new T.Vector3(-20, 35, 12), 55);
+      g.add(mesh(new T.PlaneGeometry(130, 150).rotateX(-Math.PI / 2), mat(0x354c3c), false, true));
+      var lane = mesh(new T.PlaneGeometry(5, 50).rotateX(-Math.PI / 2), mat(0x897a65), false, true);
+      lane.position.set(0, 0.04, 23); g.add(lane);
+      function home(x, z, color, label) {
+        var h = new T.Group(); h.position.set(x, 0, z); g.add(h);
+        var body = mesh(new T.BoxGeometry(6, 4, 5), mat(color), true, true); body.position.y = 2; h.add(body);
+        var roof = mesh(gable(6.6, 5.8, 2), mat(0x34333b)); roof.position.y = 4; h.add(roof);
+        [-1.6, 1.6].forEach(function (wx) {
+          var win = mesh(new T.BoxGeometry(0.8, 1, 0.12), mat(0xffd18b, { emissive: 0xc48130, emissiveIntensity: 0.8 }), false);
+          win.position.set(wx, 2.1, 2.55); h.add(win);
+        });
+        var sign = labelSprite(label, '#152238', '#ffdfa0'); sign.position.set(0, 7.1, 0); sign.scale.set(9, 1.4, 1); h.add(sign);
+      }
+      home(-8, 44, 0xb2a493, 'Parsonage · reconstruction');
+      home(-8, 28, 0x876c65, 'Lantern · fictional');
+      home(8, 10, 0x82929a, 'Orchard · fictional');
+      var residents = [], rings = [];
+      [[-2.8, 44], [-2.8, 28], [2.8, 10]].forEach(function (p, i) {
+        var resident = person({ coat: i ? 0x977870 : 0x4a667b, pants: 0x6c6558, hat: 'round', hatColor: 0x292e39 });
+        resident.position.set(p[0], 0, p[1]); resident.rotation.y = i === 2 ? -Math.PI / 2 : Math.PI / 2;
+        g.add(resident); residents.push(resident);
+        var ring = new T.Mesh(new T.RingGeometry(0.7, 1.05, 16).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffd18b }));
+        ring.position.set(0, 0.07, p[1]); g.add(ring); rings.push(ring);
+      });
+      for (var i = 0; i < 24; i++) {
+        var tr = new T.Group(); tr.position.set((i % 2 ? -1 : 1) * (15 + i % 4 * 2), 0, i * 2.2 - 2);
+        var trunk = mesh(new T.CylinderGeometry(0.25, 0.35, 2, 5), mat(0x4b3621)); trunk.position.y = 1; tr.add(trunk);
+        var crown = mesh(new T.ConeGeometry(2.3, 6, 6), mat(0x304638)); crown.position.y = 4.5; tr.add(crown); g.add(tr);
+      }
+      var horse = new T.Group(), legs = [];
+      [[0.8, 0.9, 2.2, 0, 1.5, 0], [0.45, 1.1, 0.5, 0, 2.1, -1.05], [0.38, 0.4, 0.8, 0, 2.55, -1.45]].forEach(function (b) {
+        var part = mesh(new T.BoxGeometry(b[0], b[1], b[2]), mat(0x674c37)); part.position.set(b[3], b[4], b[5]); horse.add(part);
+      });
+      [[-0.28, -0.85], [0.28, -0.85], [-0.28, 0.85], [0.28, 0.85]].forEach(function (p) {
+        var leg = mesh(G.leg, mat(0x40312b)); leg.scale.set(1.3, 1.4, 1.3); leg.position.set(p[0], 1.1, p[1]); horse.add(leg); legs.push(leg);
+      });
+      var eli = person({ coat: 0xd9af55, pants: 0x45516a, hat: 'round', hatColor: 0x826547 });
+      eli.scale.setScalar(0.8); eli.position.y = 1.2; eli.rotation.y = Math.PI;
+      eli.userData.legs.forEach(function (leg) { leg.rotation.x = -1.2; }); horse.add(eli); g.add(horse);
+      return { scene: scene, horse: horse, legs: legs, rings: rings };
+    }
+
+    // WL-S2 reuses the Green before the arrival. No replay or firing API is invoked.
+    function makeDawn(lex, stops) {
+      lex.poseCutscene(0);
+      lex.regs.forEach(function (r) { r.visible = false; }); lex.horse.visible = false;
+      var g = new T.Group(); lex.scene.add(g);
+      var rings = [];
+      stops.forEach(function (s) {
+        var ring = new T.Mesh(new T.RingGeometry(0.7, 1.05, 16).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffd18b }));
+        ring.position.set(s.x, 0.12, s.z); g.add(ring); rings.push(ring);
+        var label = labelSprite(s.name); label.position.set(s.x, 3.4, s.z); label.scale.set(5.8, 0.9, 1); g.add(label);
+        if (['parker', 'militia', 'town'].includes(s.id)) {
+          var p = person({ coat: s.id === 'parker' ? 0x4a667b : 0x977870, pants: 0x6c6558, hat: 'round', hatColor: 0x292e39 });
+          p.position.set(s.x, 0.05, s.z + 1.7); p.rotation.y = Math.PI; g.add(p);
+        }
+      });
+      var eli = person({ coat: 0xd9af55, pants: 0x45516a, hat: 'round', hatColor: 0x826547 });
+      eli.scale.setScalar(0.8); g.add(eli);
+      var edge = mesh(new T.BoxGeometry(26, 0.06, 0.18), mat(0xffd18b), false);
+      edge.position.set(0, 0.1, -16); g.add(edge);
+      g.visible = false;
+      return { scene: lex.scene, group: g, eli: eli, rings: rings,
+        pose: function (x, z, dx, dz, time) {
+          eli.position.set(x, 0.05, z);
+          if (dx || dz) { eli.rotation.y = Math.atan2(dx, dz); walkLegs(eli, time, 9); }
+          else standLegs(eli);
+        } };
+    }
+
+    // WL-S3 uses no shooter plan or firing events. The pivot has no origin to reveal.
+    function makeGreen(lex, stops) {
+      var walkers = makeDawn(lex, stops), blocker = mesh(new T.BoxGeometry(12, 8, 1), mat(0x73533d));
+      walkers.group.add(blocker); blocker.visible = false;
+      return { group: walkers.group,
+        pose: function (x, z, dx, dz, time, phase, t, spot, yaw) {
+          lex.poseCutscene(phase === 'green-event' ? Math.min(23, 14 + t * 1.5) : 14);
+          lex.regs.forEach(function (r) { r.visible = true; });
+          lex.horse.visible = phase === 'green-event' && t >= 3;
+          if (lex.horse.visible) lex.horse.position.z = lerp(22, 6.6, ease(clamp01((t - 3) / 3)));
+          lex.hidden.visible = false; lex.ring.visible = false;
+          Object.keys(lex.markers).forEach(function (k) { lex.markers[k].visible = false; });
+          lex.fx.clear(); lex.militia.forEach(function (m) { m.visible = true; }); walkers.pose(x, z, dx, dz, time);
+          walkers.rings.forEach(function (r, i) { r.visible = phase === 'shelter' ? stops[i].id === 'shelter' : phase === 'green'; });
+          // Hide destination labels during observation so they cannot float through the obstruction.
+          walkers.group.children.forEach(function (c) { if (c.isSprite) c.visible = ['green', 'shelter'].includes(phase); });
+          blocker.visible = phase === 'green-event' && t >= 6 && t < 10;
+          if (phase === 'green-event') {
+            time = t;
+            var px = spot === 'corner' ? 18 : 10;
+            cam.position.set(px, 1.9, -14); cam.lookAt(0, 1.8, 5);
+            blocker.position.set(px - 0.9, 3, -12); blocker.rotation.y = -Math.atan2(px, 19);
+            walkers.eli.visible = false;
+            if (t >= 10) {
+              var k = Math.min(1, (t - 10) / 5);
+              lex.militia.forEach(function (m, i) { m.position.x += k * (i % 2 ? 6 : -6); m.position.z -= k * 8; walkLegs(m, time, 10); });
+              lex.regs.forEach(function (r) { if (r.userData.adv) { r.position.z -= k * 4; walkLegs(r, time, 10); } });
+              // Diffuse aftermath smoke has no first-shot muzzle, flash, direction, or identity.
+              // No localized cloud that could suggest which line fired first.
+            }
+            lex.militia.forEach(function (m) { m.visible = m.position.distanceTo(cam.position) >= 2.5; });
+          } else {
+            walkers.eli.visible = !['study', 'hypothesis', 'essay', 'finished'].includes(phase);
+            cam.position.set(x + Math.sin(yaw) * 10, 8, z + Math.cos(yaw) * 10); cam.lookAt(x, 1, z + 3);
+            if (phase !== 'green') {
+              lex.militia.forEach(function (m) { m.position.z -= 8; });
+              lex.regs.forEach(function (r) { if (r.userData.adv) r.position.z -= 4; });
+            }
+          }
+        }
+      };
+    }
+
     // ---------- cameras, picking ----------
     var cam = new T.PerspectiveCamera(50, 1, 0.1, 600), camB = new T.PerspectiveCamera(50, 1, 0.1, 600);
     var controls = new T.OrbitControls(cam, cv);
@@ -560,7 +679,7 @@
 
     return {
       renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls,
-      makeLex: makeLex, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
+      makeLex: makeLex, makeNight: makeNight, makeDawn: makeDawn, makeGreen: makeGreen, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
       globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; } },
       pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3
     };

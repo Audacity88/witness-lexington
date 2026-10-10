@@ -22,7 +22,7 @@
   "name": "cut-dark",
   "js": "WitnessGame.seek('cutscene',{t:27.5,pause:true})",
   "shot": "04-cut-dark",
-  "expect": "document.body.innerText.includes('No witness saw who fired first.')"
+  "expect": "document.body.innerText.includes('These accounts do not settle who fired first.')"
  },
  {
   "name": "pick",
@@ -86,7 +86,7 @@
   "name": "essay-type",
   "type": {
    "sel": ".wg-ta",
-   "text": "I believe the British regulars fired first. Paul Revere saw the smoke in front of the Troops, and the Doolittle engraving shows the British firing. In my reenactment I picked a regular in front of the militia, and the depositions card was green. The British account from Barker's diary says the militia fired two shots first, but it is only a paraphrase and unverified, so it is weaker. It is still possible though, because a house covered the militia from Revere."
+   "text": "I believe the British regulars fired first. Paul Revere saw the smoke in front of the Troops, and the Doolittle engraving shows the British firing. In my reenactment I picked a regular in front of the militia, and the depositions card was green. The British account from Barker's diary says the militia fired one or two shots first, but it is a paraphrase of a British account, which might favor his own side. It is still possible though, because a house covered the militia from Revere."
   },
   "after": "WitnessGame.checkEssay()",
   "shot": "13-essay-passing",

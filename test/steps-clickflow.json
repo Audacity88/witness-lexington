@@ -26,7 +26,7 @@
  {"name":"b-ev","click":"[data-r=ev]","wait":1200,"expect":"(s=>s.accepted&&!s.offerOtherSide&&s.sides.british.played)(WitnessGame.state())"},
  {"name":"b-room","click":"[data-e=room]","wait":800,"shot":"click-room-both"},
  {"name":"b-essay","click":"[data-r=essay]","wait":500,"expect":"document.querySelector('.wg-ta').value.startsWith('I think the regulars')"},
- {"name":"type-more","type":{"sel":".wg-ta","text":" In my reenactment I picked a regular in front of the militia and the depositions card was green. When I played the British account the militiaman in the ranks made the depositions card red. The British account from Barker's diary says the militia fired two shots first, but it is only a paraphrase and unverified, so it is weaker, though it is still possible because a house covered the militia from Revere."},"wait":200},
+ {"name":"type-more","type":{"sel":".wg-ta","text":" In my reenactment I picked a regular in front of the militia and the depositions card was green. When I played the British account the militiaman in the ranks made the depositions card red. The British account from Barker's diary says the militia fired one or two shots first, but it is a paraphrase of a British account, which might favor his own side, though it is still possible because a house covered the militia from Revere."},"wait":200},
  {"name":"check2","click":"[data-s=check]","wait":900,"shot":"click-essay-pass","expect":"(e=>e.passed&&e.own.some(o=>o.side==='british')&&e.flags.pasteAttempted===false&&e.flags.lowKeystrokeRatio===false)(WitnessGame.state().essay)"},
  {"name":"again","click":"[data-s=again]","wait":1500,"expect":"WitnessGame.state().stage==='cutscene'&&!WitnessGame.state().sides.militia"},
  {"name":"final","js":"WitnessGame.state()"}

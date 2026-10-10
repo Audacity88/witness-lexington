@@ -1,0 +1,121 @@
+{
+  "table": {
+    "revere1775": {
+      "location": {
+        "front": "G",
+        "between": "-",
+        "ranks": "R",
+        "wall": "R",
+        "house": "R"
+      }
+    },
+    "revere1798": {
+      "shooter": {
+        "officer": "G",
+        "regular": "R",
+        "militiaman": "R",
+        "hidden": "-"
+      },
+      "aftermath": {
+        "volley": "G",
+        "fewshots": "G",
+        "stopped": "R",
+        "even": "G"
+      }
+    },
+    "barker": {
+      "shooter": {
+        "militiaman": "G",
+        "regular": "R",
+        "officer": "R",
+        "hidden": "-"
+      }
+    },
+    "depositions": {
+      "shooter": {
+        "regular": "G",
+        "officer": "G",
+        "militiaman": "R",
+        "hidden": "-"
+      }
+    },
+    "doolittle": {
+      "shooter": {
+        "regular": "G",
+        "officer": "G",
+        "militiaman": "R"
+      },
+      "aftermath": {
+        "volley": "G",
+        "fewshots": "G",
+        "stopped": "R",
+        "even": "G"
+      }
+    },
+    "numbers": {
+      "aftermath": {
+        "volley": "G",
+        "fewshots": "G",
+        "driveback": "R"
+      }
+    },
+    "formation": {
+      "shooter": {
+        "regular": "G",
+        "officer": "G",
+        "militiaman": "G",
+        "hidden": "G"
+      }
+    },
+    "outcome": {
+      "aftermath": {
+        "volley": "G",
+        "fewshots": "G",
+        "stopped": "R",
+        "even": "R",
+        "driveback": "R"
+      }
+    },
+    "control": {
+      "aftermath": {
+        "volley": "G",
+        "fewshots": "G",
+        "stopped": "R",
+        "driveback": "R"
+      }
+    }
+  },
+  "shooters": {
+    "regular": {
+      "label": "A regular",
+      "sub": "a British soldier in the line",
+      "zones": [
+        "front",
+        "between"
+      ]
+    },
+    "officer": {
+      "label": "An officer's pistol",
+      "sub": "a British officer",
+      "zones": [
+        "front",
+        "between"
+      ]
+    },
+    "militiaman": {
+      "label": "A militiaman",
+      "sub": "in the ranks on the Green",
+      "zones": [
+        "ranks"
+      ]
+    },
+    "hidden": {
+      "label": "Someone hidden",
+      "sub": "behind the wall or a house \u2014 side unknown",
+      "zones": [
+        "wall",
+        "house"
+      ]
+    }
+  }
+}
