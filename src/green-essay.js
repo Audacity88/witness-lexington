@@ -74,7 +74,10 @@
     function showDocument() {
       var s = g(), c = D.cards.find(function (c) { return c.id === s.document; });
       showCard('Evidence room · modern study', 'Read each source, then compare usefulness. This room is outside the 1775 story.');
-      add('Inspected ' + s.inspected.length + '/9. Sources are shown individually; your draft stays on this device.');
+      add('Inspected ' + s.inspected.length + '/9. Sources are shown individually; your draft stays on this device.', 'ledger');
+      var pips = env.el('div', 'pips'); pips.setAttribute('aria-hidden', 'true');
+      D.cards.forEach(function (card) { pips.appendChild(env.el('span', s.inspected.includes(card.id) ? 'pip done' : card.id === c.id ? 'pip current' : 'pip')); });
+      body.appendChild(pips);
       select('Choose one document', 'document', D.cards.map(function (c) { return [c.id, c.title]; }), c.id, function (v) { s.document = v; render(); });
       body.appendChild(env.el('h2', '', c.title + (c.date ? ' · ' + c.date : ''))); source(c);
       if (c.id === 'doolittle') { var im = env.el('img'); im.src = window.WG_DOOLITTLE_SRC || 'assets/doolittle-plate1.webp'; im.alt = D.room.doolittle.alt; im.className = 'document-image'; body.appendChild(im); }
@@ -138,10 +141,11 @@
       zones(); location.addEventListener('change', function () { v.location = location.value; clearResult(); });
       select('Aftermath', 'aftermath', Object.entries(D.aftermaths).map(function (e) { return [e[0], e[1].label]; }), v.aftermath, function (id) { v.aftermath = id; clearResult(); });
       var writeAction = null;
-      function clearResult() { result.replaceChildren(); if (writeAction) { writeAction.remove(); writeAction = null; } }
+      function clearResult() { result.replaceChildren(); result.className = ''; if (writeAction) { writeAction.remove(); writeAction = null; } }
       var result = env.el('div'); result.id = 'hypothesis-result'; result.setAttribute('role', 'status'); body.appendChild(result);
       b('Check this hypothesis', function () {
         draft = Object.assign({}, v); var sc = C.score(v); s.hypothesis = { version: Object.assign({}, v) }; save(); result.replaceChildren();
+        result.className = sc.accepted ? 'verdict fits' : 'verdict contradicts';
         env.paragraph(result, sc.accepted ? 'Fits the inherited fact checks. This does not prove who fired first.' : 'Contradicts the inherited fact checks. Revise your hypothesis.');
         // Name every contradicting source for this test, regardless of the last viewed card.
         sc.redFacts.concat(sc.redTestimony).forEach(function (id) {
@@ -162,7 +166,7 @@
       add('Use at least ' + E.minRefs + ' evidence references and at least ' + E.minWords + ' words. Write at least three distinct claim sentences of five or more words each, connect evidence to your conclusion, and keep each sentence focused on one or two sources or facts. Use source details in complete claims and avoid repeated sentences or keyword lists. Address the opposing account and weigh it. Inspected historical cards count; your tested hypothesis can count once. Fictional speech is not primary testimony.');
       add('This is a local pattern check. Passing it does not settle history or confirm authorship. Confirmed outside authorship must be disqualified by teacher review outside this game.');
       var ta = input('textarea', 'Write your own answer', 'essay-text'); ta.rows = 8; ta.maxLength = 20000; ta.value = s.essay;
-      var count = env.el('p'), warning = env.el('p'); warning.id = 'paste-warning'; warning.setAttribute('role', 'status'); body.append(count, warning);
+      var count = env.el('p', 'word-count'), warning = env.el('p'); warning.id = 'paste-warning'; warning.setAttribute('role', 'status'); body.append(count, warning);
       var result = env.el('div'); result.id = 'essay-result'; result.setAttribute('role', 'status'); body.appendChild(result);
       var finish = null, pending = 0, lastInput = null, burstStart = null, burstChars = 0;
       // Store edit deltas, not a full essay copy per keystroke. Native history may group multiple edits.
@@ -261,7 +265,8 @@
       }
       if (p() === 'shelter' && g().sheltered) { shelterCard(); return; }
       env.overlay.hidden = true; env.panel.hidden = false; env.actionRow.hidden = false; env.notice.hidden = false; env.route.replaceChildren();
-      env.objective.textContent = p() === 'green' ? 'Choose either reconstructed spectator spot. Neither reveals a first shooter. [PIVOT]' : p() === 'shelter' ? 'Walk to the marked shelter. There is no timer or combat.' : G.captions[Math.min(2, Math.floor(env.elapsed() / 6))];
+      env.panel.classList.toggle('is-caption', p() === 'green-event');
+      env.setText(env.objective, p() === 'green' ? 'Choose either reconstructed spectator spot. Neither reveals a first shooter. [PIVOT]' : p() === 'shelter' ? 'Walk to the marked shelter. There is no timer or combat.' : G.captions[Math.min(2, Math.floor(env.elapsed() / 6))]);
       if (p() === 'green-event') {
         env.actionRow.hidden = true;
         if (env.elapsed() >= 15) env.route.appendChild(env.button('Move to shelter', function () { g().observed = true; env.go('shelter'); }, 'to-shelter', true));
@@ -299,7 +304,7 @@
       scene.pose(s.x, s.z, dx, dz, now / 1000, p(), env.elapsed(), s.spot, yaw);
       if (p() === 'green-event' && active) {
         env.tick(dt);
-        var t = env.elapsed(); env.objective.textContent = G.captions[t < 6 ? 0 : t < 10 ? 1 : 2];
+        var t = env.elapsed(); env.setText(env.objective, G.captions[t < 6 ? 0 : t < 10 ? 1 : 2]);
         if (t >= 15 && !env.route.querySelector('#to-shelter')) render();
       } else if (['green', 'shelter'].includes(p()) && !s.sheltered) updateInteraction();
       env.W.renderer.render(env.lex.scene, env.W.cam);

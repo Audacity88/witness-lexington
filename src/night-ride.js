@@ -78,7 +78,16 @@
     var b = el('button', primary ? 'primary' : '', text); b.type = 'button';
     if (id) b.id = id; b.addEventListener('click', action); return b;
   }
-  function paragraph(parent, text, cls) { parent.appendChild(el('p', cls || '', text)); }
+  // Source tags such as [NIGHT] render as rubric spans; the text itself is unchanged.
+  function rich(node, text) {
+    var parts = String(text).split(/(\[[A-Z0-9]+\])/);
+    if (parts.length === 1) { node.textContent = text; return node; }
+    node.textContent = '';
+    parts.forEach(function (part, i) { if (part) node.appendChild(el('span', i % 2 ? 'src' : '', part)); });
+    return node;
+  }
+  function setText(node, text) { if (node.textContent !== text) rich(node, text); }
+  function paragraph(parent, text, cls) { parent.appendChild(rich(el('p', cls || ''), text)); }
   var top = el('div', 'top'), brand = el('div', 'brand'), tools = el('div', 'row');
   brand.appendChild(el('b', '', 'Witness Lexington')); var chapter = el('small', '', 'Dawn of April 19 · reconstructed opening'); brand.appendChild(chapter);
   var notebookButton = button('Notebook', notebook, 'notebook');
@@ -99,17 +108,20 @@
     modalReturn = null;
   });
   function clearMovement() { keys = {}; target = null; drag = null; }
-  function openDialog(title) {
-    clearMovement(); modalReturn = document.activeElement; dialog.replaceChildren();
-    var header = el('header'); header.appendChild(el('h2', '', title)); dialog.appendChild(header);
+  function openDialog(title, kind) {
+    clearMovement(); modalReturn = document.activeElement; dialog.replaceChildren(); dialog.className = kind || 'talk';
+    var header = el('header'); header.setAttribute('data-initial', title.charAt(0)); header.appendChild(el('h2', '', title)); dialog.appendChild(header);
     dialog.showModal();
   }
+  // The dialog's primary action shares the sticky footer with Close so it never falls below the fold.
   function closeControl() {
-    var row = el('div', 'close'); row.appendChild(button('Close', function () { dialog.close(); }, 'close-dialog')); dialog.appendChild(row);
+    var row = el('div', 'close');
+    Array.from(dialog.children).filter(function (n) { return n.tagName === 'BUTTON' && n.className === 'primary'; }).forEach(function (n) { row.appendChild(n); });
+    row.appendChild(button('Close', function () { dialog.close(); }, 'close-dialog')); dialog.appendChild(row);
   }
   function sourceNote(parent, text, id) { paragraph(parent, text + ' ' + id, 'tag'); }
   function notebook() {
-    openDialog('Eli\'s notebook');
+    openDialog('Eli\'s notebook', 'notebook');
     paragraph(dialog, 'Eli is fictional. Errands and speech are dramatized. These gameplay notes are not primary testimony.');
     dialog.appendChild(el('h3', '', 'Opening captions'));
     D.captions.concat([D.pivot, D.rewind]).forEach(function (c) { paragraph(dialog, c.text + ' ' + c.source); });
@@ -145,11 +157,12 @@
     closeControl();
   }
   function showCard(title, text, tag) {
-    card.replaceChildren(); if (tag) paragraph(card, tag, 'tag'); card.appendChild(el('h1', '', title)); paragraph(card, text);
+    card.replaceChildren(); card.className = 'card'; if (tag) paragraph(card, tag, 'tag kicker'); card.appendChild(el('h1', '', title)); paragraph(card, text);
     studyNotice.textContent = notice.textContent; if (later()) card.appendChild(studyNotice);
     overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-label', title);
     card.classList.toggle('study-card', later() && modern() && !paused);
     overlay.hidden = false; overlay.classList.toggle('black', state.phase === 'blackout');
+    overlay.classList.toggle('study', later() && modern());
   }
   function go(phase) {
     if (slice) slice.finishFocus();
@@ -157,7 +170,16 @@
     if (dialog.open) dialog.close(); save(); render();
   }
   function rewind() { go('rewind'); }
-  function render() {
+  // Every overlay card gets a scrolling body and a fixed action footer, as the study cards already do.
+  function splitCard() {
+    if (overlay.hidden || card.querySelector('.card-scroll')) return;
+    var body = el('div', 'card-scroll'), actions = el('div', 'card-actions');
+    Array.from(card.children).forEach(function (n) { (n.tagName === 'BUTTON' ? actions : body).appendChild(n); });
+    card.append(body, actions);
+  }
+  function render() { draw(); splitCard(); }
+  function draw() {
+    panel.classList.toggle('is-caption', state.phase === 'opening');
     chapter.textContent = ['intro', 'opening', 'blackout'].includes(state.phase) ? 'Dawn of April 19 · reconstructed opening' : later() ? modern() ? 'Modern study · evidence and answer' : 'Lexington Green · reconstructed scene' : ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
     panel.hidden = !playable(); overlay.hidden = true;
     top.inert = paused || !playable() && state.phase !== 'opening';
@@ -171,6 +193,7 @@
     }
     if (state.phase === 'intro') {
       showCard('Witness Lexington', 'A warning in the night. A question at dawn. Play Eli, a fictional 12-year-old Lexington resident.', 'Night alarm, dawn muster, Green, and investigation');
+      card.classList.add('is-title'); card.querySelector('h1').replaceChildren(el('span', 'title-kicker', 'Witness'), el('span', '', ' '), el('span', 'title-main', 'Lexington'));
       paragraph(card, 'Your errands are dramatized. Historical context has source labels in your notebook. No combat or timer.');
       var start = button('Begin the opening', function () { go('opening'); }, 'begin', true); card.appendChild(start);
       if (saved) card.appendChild(button('Resume saved run', function () { state = JSON.parse(JSON.stringify(saved)); go(state.phase); }, 'load'));
@@ -202,7 +225,7 @@
       paragraph(card, 'Continue on foot to the dawn muster. Your alarm notes stay in the notebook.');
       card.appendChild(button('Continue to dawn muster', function () { go('dawn'); }, 'continue-dawn', true));
       paragraph(card, storageOK ? 'Checkpoint saved on this device. You can return to your notebook after a refresh.' : 'Saving is unavailable. Keep this page open to retain your notebook.');
-      card.appendChild(button('Read the notebook', notebook, 'end-notebook', true));
+      card.appendChild(button('Read the notebook', notebook, 'end-notebook'));
       card.appendChild(button('Replay the opening', function () { replayPhase = state.phase; replaying = true; go('opening'); }, 'replay'));
       card.appendChild(button('Restart this run', restart, 'restart'));
     } else if (state.phase === 'dawn') {
@@ -226,32 +249,32 @@
       paragraph(card, 'Choose a spectator spot on the Green, then investigate historical documents in the modern evidence room.');
       card.appendChild(button('Continue to the Green', function () { yaw = 0; go('green'); }, 'continue-green', true));
       paragraph(card, storageOK ? 'Checkpoint saved on this device.' : 'Saving is unavailable. Keep this page open to retain your notebook.');
-      card.appendChild(button('Read the notebook', notebook, 'end-notebook', true));
+      card.appendChild(button('Read the notebook', notebook, 'end-notebook'));
       card.appendChild(button('Replay the opening', function () { replayPhase = state.phase; replaying = true; go('opening'); }, 'replay'));
       card.appendChild(button('Restart this run', restart, 'restart'));
     } else if (later()) slice.render();
   }
   function restart() {
-    openDialog('Restart this run?'); paragraph(dialog, 'This clears the saved run and Eli\'s gameplay observations.');
+    openDialog('Restart this run?', 'confirm'); paragraph(dialog, 'This clears the saved run and Eli\'s gameplay observations.');
     dialog.appendChild(button('Clear and restart', function () {
       try { localStorage.removeItem(STORE); } catch (e) { storageOK = false; }
       saved = null; slice.reset(); state = fresh(); replaying = false; dialog.close(); go('intro');
     }, 'confirm-restart', true)); closeControl();
   }
   function caption() {
-    var i = Math.min(2, Math.floor(elapsed / 7)); objective.textContent = D.captions[i].text + ' ' + D.captions[i].source;
+    var i = Math.min(2, Math.floor(elapsed / 7)); setText(objective, D.captions[i].text + ' ' + D.captions[i].source);
   }
   function updateObjective() {
     if (onFoot()) {
       var d = state.dawn;
-      objective.textContent = !d.met ? 'Meet Parker at the marked stop. Speech is dramatized. [FORMATION] [COMMAND]' :
+      setText(objective, !d.met ? 'Meet Parker at the marked stop. Speech is dramatized. [FORMATION] [COMMAND]' :
         musterDone() ? 'Find the spectator boundary and record the limits of what you heard.' :
-        'Deliver the message ' + (d.delivered ? '(done)' : '(pending)') + '; compare listening spots ' + d.listened.length + '/2; ask both fictional witnesses ' + d.questions.length + '/2. [COMMAND]';
+        'Deliver the message ' + (d.delivered ? '(done)' : '(pending)') + '; compare listening spots ' + d.listened.length + '/2; ask both fictional witnesses ' + d.questions.length + '/2. [COMMAND]');
       return;
     }
-    objective.textContent = !state.accepted ? 'Meet Revere at the parsonage. This encounter is dramatized. [NIGHT]' :
+    setText(objective, !state.accepted ? 'Meet Revere at the parsonage. This encounter is dramatized. [NIGHT]' :
       state.visited.length < 2 ? 'Carry the warning to both fictional households. Alarmed ' + state.visited.length + ' of 2. Choose either order.' :
-      'Both households are alarmed. Return to the parsonage meeting point.';
+      'Both households are alarmed. Return to the parsonage meeting point.');
   }
   function nearby() {
     if (onFoot()) return B.stops.find(function (s) { return Math.hypot(state.dawn.x - s.x, state.dawn.z - s.z) < 1.6; });
@@ -374,7 +397,7 @@
     W.cam.aspect = host.clientWidth / Math.max(1, host.clientHeight); W.cam.updateProjectionMatrix();
   }
   slice = S.create({ W: W, lex: lex, card: card, panel: panel, overlay: overlay, actionRow: actionRow, notice: notice,
-    route: route, objective: objective, interactButton: interactButton, el: el, paragraph: paragraph, button: button,
+    route: route, objective: objective, interactButton: interactButton, el: el, paragraph: paragraph, button: button, setText: setText,
     showCard: showCard, go: go, notebook: notebook, restart: restart, save: save,
     state: function () { return state; }, target: function () { return target; }, setTarget: function (t) { target = t; },
     elapsed: function () { return elapsed; }, tick: function (dt) { elapsed += dt; }
@@ -415,7 +438,7 @@
       dawn.pose(d.x, d.z, mx, mz, now / 1000);
       dawn.rings.forEach(function (ring, i) {
         var id = B.stops[i].id, done = id === 'parker' ? d.met : id === 'militia' ? d.delivered && d.questions.includes(id) : id === 'boundary' ? d.boundary : d.listened.includes(id) || d.questions.includes(id);
-        ring.material.color.set(done ? 0x83c4b2 : 0xffd18b);
+        ring.material.color.set(done ? 0xe9dcb8 : 0xc0473a);
       });
       W.cam.position.set(d.x + Math.sin(yaw) * 12, 10, d.z + Math.cos(yaw) * 12);
       W.cam.lookAt(d.x, 1, d.z + 3); W.renderer.render(dawn.scene, W.cam);
@@ -442,7 +465,7 @@
       }
       night.horse.position.set(state.x, 0, state.z);
       night.legs.forEach(function (leg, i) { leg.rotation.x = dx || dz ? Math.sin(now / 140 + i * 1.6) * 0.4 : 0; });
-      night.rings.forEach(function (ring, i) { ring.material.color.set(state.visited.includes(D.stops[i].id) ? 0x83c4b2 : 0xffd18b); });
+      night.rings.forEach(function (ring, i) { ring.material.color.set(state.visited.includes(D.stops[i].id) ? 0xe9dcb8 : 0xc0473a); });
       W.cam.position.set(state.x + Math.sin(yaw) * 14, 10, state.z + Math.cos(yaw) * 14);
       W.cam.lookAt(state.x, 1.5, state.z - 1); W.renderer.render(night.scene, W.cam);
       if (state.phase === 'ride') updateInteraction();
