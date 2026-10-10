@@ -48,8 +48,23 @@ function audit() {
   if (root === document) {
     const canvas = document.querySelector('canvas').getBoundingClientRect();
     const hud = Array.from(document.querySelectorAll('.top .brand, .top .row, .panel')).filter(e => shown(e) && !e.closest('[hidden]')).map(e => e.getBoundingClientRect());
-    const placed = [];
-    for (const l of WitnessGame.snapshot().labels) {
+    const placed = [], snap = WitnessGame.snapshot(), run = snap.run, d = run.dawn, g = run.green;
+    // The objective's stops, derived here from the run state independently of the game's own focus list.
+    const expected = run.phase === 'ride' ? (!run.accepted || run.visited.length === 2 ? ['parsonage'] : ['lantern', 'orchard'].filter(id => !run.visited.includes(id)))
+      : run.phase === 'muster' ? (!d.met ? ['parker'] : d.delivered && d.listened.length === 2 && d.questions.length === 2 ? (d.boundary ? [] : ['boundary'])
+        : ['militia', 'near', 'far', 'town'].filter(id => id === 'militia' ? !(d.delivered && d.questions.includes(id)) : id === 'town' ? !d.questions.includes(id) : !d.listened.includes(id)))
+      : run.phase === 'green' && !g.sheltered ? ['corner', 'edge'] : run.phase === 'shelter' && !g.sheltered ? ['shelter'] : [];
+    for (const id of expected) {
+      const l = snap.labels.find(l => l.id === id);
+      if (!l) { out.labels.push(`objective label ${id} not shown`); continue; }
+      if (l.pinned) {
+        const a = l.arrow, r = a && { left: canvas.left + a.x - a.size / 2, top: canvas.top + a.y - a.size / 2, right: canvas.left + a.x + a.size / 2, bottom: canvas.top + a.y + a.size / 2 };
+        if (!a) out.labels.push(`objective label ${id} pinned without an arrow`);
+        else if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight || hud.some(h => hit(r, h))) out.labels.push(`objective arrow ${id} ${box(r)} off screen or under HUD`);
+      }
+    }
+    if (run.phase === 'green' && snap.labels.some(l => l.id === 'shelter')) out.labels.push('shelter label shown before the shelter step');
+    for (const l of snap.labels) {
       const r = { left: canvas.left + l.left, top: canvas.top + l.top, right: canvas.left + l.left + l.width, bottom: canvas.top + l.top + l.height, width: l.width, height: l.height }, why = [];
       if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) why.push('viewport');
       if (hud.some(h => hit(r, h))) why.push('under HUD');
