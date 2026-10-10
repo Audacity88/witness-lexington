@@ -276,6 +276,20 @@
       state.visited.length < 2 ? 'Carry the warning to both fictional households. Alarmed ' + state.visited.length + ' of 2. Choose either order.' :
       'Both households are alarmed. Return to the parsonage meeting point.');
   }
+  // Stops the current objective points to. Their scene labels stay visible, or pin to the screen edge.
+  function objectiveStops() {
+    if (state.phase === 'ride') {
+      if (!state.accepted || state.visited.length === 2) return ['parsonage'];
+      return ['lantern', 'orchard'].filter(function (id) { return !state.visited.includes(id); });
+    }
+    if (!onFoot()) return [];
+    var d = state.dawn;
+    if (!d.met) return ['parker'];
+    if (musterDone()) return d.boundary ? [] : ['boundary'];
+    return ['militia', 'near', 'far', 'town'].filter(function (id) {
+      return id === 'militia' ? !(d.delivered && d.questions.includes(id)) : id === 'town' ? !d.questions.includes(id) : !d.listened.includes(id);
+    });
+  }
   function nearby() {
     if (onFoot()) return B.stops.find(function (s) { return Math.hypot(state.dawn.x - s.x, state.dawn.z - s.z) < 1.6; });
     return D.stops.find(function (s) { return Math.hypot(state.x, state.z - s.z) < 3.5; });
@@ -426,7 +440,7 @@
       if (dawn) dawn.group.visible = false;
       lex.regs.forEach(function (r) { r.visible = true; });
       lex.poseCutscene(state.phase === 'intro' ? 15 : Math.min(19.5, 7 + elapsed * 0.65)); lex.horse.visible = false;
-      W.cam.position.set(27, 19, 34); W.cam.lookAt(0, 1, 4); W.renderer.render(lex.scene, W.cam);
+      W.labelFocus = []; W.cam.position.set(27, 19, 34); W.cam.lookAt(0, 1, 4); W.renderer.render(lex.scene, W.cam);
     } else if (['dawn', 'muster', 'muster-complete'].includes(state.phase)) {
       if (!dawn) dawn = W.makeDawn(lex, B.stops);
       dawn.group.visible = true; lex.regs.forEach(function (r) { r.visible = false; }); lex.horse.visible = false;
@@ -449,7 +463,7 @@
         ring.done = done;
       });
       W.cam.position.set(d.x + Math.sin(yaw) * 12, 10, d.z + Math.cos(yaw) * 12);
-      W.cam.lookAt(d.x, 1, d.z + 3); W.renderer.render(dawn.scene, W.cam);
+      W.labelFocus = objectiveStops(); W.cam.lookAt(d.x, 1, d.z + 3); W.renderer.render(dawn.scene, W.cam);
       if (onFoot()) updateInteraction();
     } else {
       var dx = 0, dz = 0;
@@ -475,7 +489,7 @@
       night.legs.forEach(function (leg, i) { leg.rotation.x = dx || dz ? Math.sin(now / 140 + i * 1.6) * 0.4 : 0; });
       night.rings.forEach(function (ring, i) { ring.done = state.visited.includes(D.stops[i].id); });
       W.cam.position.set(state.x + Math.sin(yaw) * 14, 10, state.z + Math.cos(yaw) * 14);
-      W.cam.lookAt(state.x, 1.5, state.z - 1); W.renderer.render(night.scene, W.cam);
+      W.labelFocus = objectiveStops(); W.cam.lookAt(state.x, 1.5, state.z - 1); W.renderer.render(night.scene, W.cam);
       if (state.phase === 'ride') updateInteraction();
     }
     requestAnimationFrame(frame);

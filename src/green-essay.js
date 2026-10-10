@@ -307,6 +307,7 @@
         var t = env.elapsed(); env.setText(env.objective, G.captions[t < 6 ? 0 : t < 10 ? 1 : 2]);
         if (t >= 15 && !env.route.querySelector('#to-shelter')) render();
       } else if (['green', 'shelter'].includes(p()) && !s.sheltered) updateInteraction();
+      env.W.labelFocus = ['green', 'shelter'].includes(p()) && !s.sheltered ? G.stops.filter(function (st) { return p() === 'shelter' ? st.id === 'shelter' : st.id !== 'shelter'; }).map(function (st) { return st.id; }) : [];
       env.W.renderer.render(env.lex.scene, env.W.cam);
     }
     function hide() { if (scene) scene.group.visible = false; }
