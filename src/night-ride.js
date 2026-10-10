@@ -438,7 +438,7 @@
       dawn.pose(d.x, d.z, mx, mz, now / 1000);
       dawn.rings.forEach(function (ring, i) {
         var id = B.stops[i].id, done = id === 'parker' ? d.met : id === 'militia' ? d.delivered && d.questions.includes(id) : id === 'boundary' ? d.boundary : d.listened.includes(id) || d.questions.includes(id);
-        ring.material.color.set(done ? 0xe9dcb8 : 0xc0473a);
+        ring.done = done;
       });
       W.cam.position.set(d.x + Math.sin(yaw) * 12, 10, d.z + Math.cos(yaw) * 12);
       W.cam.lookAt(d.x, 1, d.z + 3); W.renderer.render(dawn.scene, W.cam);
@@ -465,7 +465,7 @@
       }
       night.horse.position.set(state.x, 0, state.z);
       night.legs.forEach(function (leg, i) { leg.rotation.x = dx || dz ? Math.sin(now / 140 + i * 1.6) * 0.4 : 0; });
-      night.rings.forEach(function (ring, i) { ring.material.color.set(state.visited.includes(D.stops[i].id) ? 0xe9dcb8 : 0xc0473a); });
+      night.rings.forEach(function (ring, i) { ring.done = state.visited.includes(D.stops[i].id); });
       W.cam.position.set(state.x + Math.sin(yaw) * 14, 10, state.z + Math.cos(yaw) * 14);
       W.cam.lookAt(state.x, 1.5, state.z - 1); W.renderer.render(night.scene, W.cam);
       if (state.phase === 'ride') updateInteraction();

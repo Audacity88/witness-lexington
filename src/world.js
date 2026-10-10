@@ -248,30 +248,49 @@
         x.closePath(); x.fill();
       }
     }
-    // White fill takes the material colour, so callers tint unvisited seals wax red and visited ones parchment.
-    function sealTexture(kind) {
-      if (SEALS[kind]) return SEALS[kind];
+    // An open seal has a white fill that the material tints wax red. A visited seal is painted parchment with a
+    // faded emblem and a check mark, so the state reads by shape as well as colour.
+    function sealTexture(kind, done) {
+      var key = kind + (done ? ':done' : '');
+      if (SEALS[key]) return SEALS[key];
       var c = document.createElement('canvas'); c.width = c.height = 256; var x = c.getContext('2d');
       x.beginPath();
       for (var i = 0; i <= 72; i++) {
         var a = i / 72 * TAU, r = 106 + Math.sin(a * 7) * 4 + Math.sin(a * 3 + 1) * 3;
         x[i ? 'lineTo' : 'moveTo'](128 + Math.cos(a) * r, 128 + Math.sin(a) * r);
       }
-      x.closePath(); x.fillStyle = '#ffffff'; x.fill(); x.lineWidth = 8; x.strokeStyle = INK; x.stroke();
+      x.closePath(); x.fillStyle = done ? '#ece0c0' : '#ffffff'; x.fill(); x.lineWidth = 8; x.strokeStyle = INK; x.stroke();
+      x.globalAlpha = done ? 0.4 : 1;
       x.beginPath(); x.arc(128, 128, 80, 0, TAU); x.lineWidth = 5; x.stroke();
       if (x.setLineDash) x.setLineDash([7, 9]);
       x.beginPath(); x.arc(128, 128, 92, 0, TAU); x.lineWidth = 3; x.stroke();
       if (x.setLineDash) x.setLineDash([]);
-      sealEmblem(x, kind);
-      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; SEALS[kind] = t; return t;
+      x.globalAlpha = done ? 0.25 : 1; sealEmblem(x, kind); x.globalAlpha = 1;
+      if (done) {
+        x.lineCap = 'round'; x.lineJoin = 'round';
+        x.beginPath(); x.moveTo(74, 132); x.lineTo(112, 172); x.lineTo(186, 84);
+        x.strokeStyle = '#ece0c0'; x.lineWidth = 40; x.stroke();
+        x.strokeStyle = INK; x.lineWidth = 30; x.stroke();
+        x.strokeStyle = '#2f5e36'; x.lineWidth = 18; x.stroke();
+      }
+      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; SEALS[key] = t; return t;
     }
     var SEAL_KIND = { parsonage: 'star', lantern: 'house', orchard: 'house', parker: 'star', militia: 'star', town: 'star',
       near: 'quill', far: 'quill', boundary: 'flag', corner: 'eye', edge: 'eye', shelter: 'house' };
     function stopMarker(id) {
+      var kind = SEAL_KIND[id] || 'star', done = false;
       var m = new T.Mesh(new T.PlaneGeometry(2.6, 2.6).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({
-        map: sealTexture(SEAL_KIND[id] || 'star'), color: STOP_TODO, transparent: true, depthWrite: false, fog: false
+        map: sealTexture(kind, false), color: STOP_TODO, transparent: true, depthWrite: false, fog: false
       }));
-      m.renderOrder = 2; return m;
+      m.renderOrder = 2;
+      Object.defineProperty(m, 'done', {
+        get: function () { return done; },
+        set: function (v) {
+          if (!!v === done) return; done = !!v;
+          m.material.map = sealTexture(kind, done); m.material.color.set(done ? 0xffffff : STOP_TODO);
+        }
+      });
+      return m;
     }
 
     // ======================= Lexington Green (instance) =======================
