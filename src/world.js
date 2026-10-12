@@ -803,8 +803,8 @@
     var pinLab = labelSprite('Lexington · AD 1775'); pinLab.position.set(0, 0, 0.1); pin.add(pinLab);
     pin.position.copy(ll2v(LEX.lat, LEX.lon, 1.002)); pin.lookAt(ll2v(LEX.lat, LEX.lon, 2)); globe.add(pin);
     var START = { lat: 18, lon: -5 };
-    var lastU = 0, displayLon = START.lon;  // Track smooth display longitude separate from logical year
-    var MAX_DEG_PER_FRAME = 90;  // Cap visible rotation to avoid aliasing (at 60fps: 90°/frame = 5,400°/s = 15 rps)
+    var displayLon = START.lon;  // Accumulated display longitude (moves monotonically westward)
+    var MAX_DEG_PER_STEP = 45;  // Cap visible change per call to avoid aliasing
     // u: 0..1 — spin from 413 BC to AD 1775, ~1 turn per year (2187 years total)
     // Year counter is accurate; visible rotation is rate-limited to prevent strobing
     function placeGlobe(u) {
@@ -812,19 +812,13 @@
       // Calculate logical target position (includes all 2187 turns)
       var turns = YEAR_SPAN, targetLon = START.lon + ((LEX.lon - START.lon) - 360 * turns) * S;
       var lat = START.lat + (LEX.lat - START.lat) * S;
-      // Smooth the visible rotation to prevent aliasing: cap angular change per call
-      var deltaU = u - lastU; lastU = u;
-      if (deltaU > 0 && u > 0.001 && u < 0.999) {  // Only rate-limit during the spin, not at endpoints
-        var delta = targetLon - displayLon;
-        // Normalize delta to [-180, 180] range
-        while (delta > 180) delta -= 360;
-        while (delta < -180) delta += 360;
-        // Cap the angular change
-        var maxChange = MAX_DEG_PER_FRAME;
-        if (Math.abs(delta) > maxChange) {
-          delta = delta > 0 ? maxChange : -maxChange;
-        }
-        displayLon += delta;
+      // Smooth the visible rotation: always move westward (decreasing longitude), capped per call
+      if (u > 0.001 && u < 0.999) {  // Only rate-limit during the spin, not at endpoints
+        // Calculate how far we need to go (always westward/negative)
+        var remaining = targetLon - displayLon;
+        // Move westward by at most MAX_DEG_PER_STEP
+        var step = Math.max(remaining, -MAX_DEG_PER_STEP);
+        displayLon += step;
       } else {
         displayLon = targetLon;  // Snap to target at start/end for exact landing
       }
