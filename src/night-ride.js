@@ -193,7 +193,10 @@
     }
     if (state.phase === 'intro') {
       showCard('Witness Lexington', 'A warning in the night. A question at dawn. Play Eli, a fictional 12-year-old Lexington resident.', 'Night alarm, dawn muster, Green, and investigation');
-      card.classList.add('is-title'); card.querySelector('h1').replaceChildren(el('span', 'title-kicker', 'Witness'), el('span', '', ' '), el('span', 'title-main', 'Lexington'));
+      card.classList.add('is-title');
+      var banner = el('header', 'title-banner'), title = card.querySelector('h1');
+      card.replaceChildren(...Array.from(card.children).map(function (n) { return n === title ? banner : n; }));
+      banner.appendChild(title); paragraph(banner, 'April 19, 1775', 'title-date');
       paragraph(card, 'Your errands are dramatized. Historical context has source labels in your notebook. No combat or timer.');
       var start = button('Begin the opening', function () { go('opening'); }, 'begin', true); card.appendChild(start);
       if (saved) card.appendChild(button('Resume saved run', function () { state = JSON.parse(JSON.stringify(saved)); go(state.phase); }, 'load'));
