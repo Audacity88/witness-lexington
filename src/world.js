@@ -794,15 +794,18 @@
     gScene.add(new T.HemisphereLight(0xcfe0ff, 0x1a2233, 0.9));
     var gSun = new T.DirectionalLight(0xfff3e0, 2.4); gSun.position.set(-3, 2.5, 5); gScene.add(gSun);
     var LEX = { lat: 42.45, lon: -71.23 };
+    var SYRACUSE_YEAR = -412, LEX_YEAR = 1775;  // 413 BC to AD 1775 (no year 0: -412 = 413 BC)
+    var YEAR_SPAN = LEX_YEAR - SYRACUSE_YEAR;   // 2187 years
+    function fmtYear(y) { return y <= 0 ? (1 - y) + ' BC' : 'AD ' + y; }
     var pin = new T.Group();
     pin.add(new T.Mesh(new T.ConeGeometry(0.012, 0.05, 6).rotateX(-Math.PI / 2).translate(0, 0, 0.025), new T.MeshBasicMaterial({ color: 0xff9a52 })));
     var pinDot = new T.Sprite(new T.SpriteMaterial({ map: GLOW, color: 0xffb070, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); pin.add(pinDot);
     var pinLab = labelSprite('Lexington · AD 1775'); pinLab.position.set(0, 0, 0.1); pin.add(pinLab);
     pin.position.copy(ll2v(LEX.lat, LEX.lon, 1.002)); pin.lookAt(ll2v(LEX.lat, LEX.lon, 2)); globe.add(pin);
     var START = { lat: 18, lon: -5 };
-    // u: 0..1 — spin in from over the Atlantic and zoom down to Lexington's real latitude/longitude
+    // u: 0..1 — spin from 413 BC to AD 1775, rotating ~1 turn per year (2187 years total)
     function placeGlobe(u) {
-      var S = ease(u), dLon = (LEX.lon - START.lon) - 360;   // one extra westward turn
+      var S = ease(u), turns = YEAR_SPAN, dLon = (LEX.lon - START.lon) - 360 * turns;
       var lon = START.lon + dLon * S, lat = START.lat + (LEX.lat - START.lat) * S;
       globe.rotation.set(lat * D2R, -lon * D2R, 0, 'XYZ');
       var alt = 0.3 + 2.4 * (1 - ease(clamp01((u - 0.35) / 0.65)));
@@ -811,6 +814,14 @@
       pin.children[0].scale.setScalar(ps); pinDot.scale.set(0.05 * ps, 0.05 * ps, 1);
       pinLab.material.opacity = far; pinLab.scale.set(0.42 * ps * 0.55, 0.08 * ps * 0.55, 1); pinLab.position.z = 0.06 * ps;
       globe.updateMatrixWorld(true); var wp = new T.Vector3(); pin.getWorldPosition(wp); pinLab.visible = wp.z > 0.25 && far > 0.01; pinDot.visible = wp.z > 0;
+      // Apply motion blur during high-speed rotation (peak velocity ~0.3-0.7)
+      var speedFactor = Math.abs(Math.sin(Math.PI * S)); // peaks at 0.5, tapers at ends
+      var blurAmount = clamp01(speedFactor * 2.2 - 0.15); // threshold to avoid blur at start/end
+      earth.material.opacity = lerp(1, 0.35, blurAmount);
+      earth.material.transparent = blurAmount > 0.01;
+      // Return current year for display
+      var year = Math.round(SYRACUSE_YEAR + YEAR_SPAN * S);
+      return { year: year, yearText: fmtYear(year) };
     }
 
     // WL-S1's fictional lane uses the same low-poly people and materials as the Green.
@@ -950,7 +961,7 @@
     var world = {
       renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls,
       makeLex: makeLex, makeNight: makeNight, makeDawn: makeDawn, makeGreen: makeGreen, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
-      globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; } },
+      globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; }, fmtYear: fmtYear },
       pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3,
       labelAvoid: null, labelFocus: [], labelBoxes: []
     };

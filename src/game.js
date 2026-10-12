@@ -198,7 +198,11 @@
   function stepCutscene(dt) {
     var t = st.cutT, prev = t; st.cutT = t = t + dt;
     if (t < GLOBE_END) {
-      st.view = 'globe'; W.globe.place(W.clamp01(t / GLOBE_END));
+      st.view = 'globe';
+      var globeData = W.globe.place(W.clamp01(t / GLOBE_END));
+      if (globeData && globeData.yearText) {
+        yearBox.innerHTML = '<b>' + globeData.yearText + '</b><span>Time-travel transition</span>';
+      }
       yearBox.style.opacity = String(W.clamp01((t - 0.6) / 0.6) * W.clamp01((GLOBE_END - 0.5 - t) / 0.5));
     } else { st.view = 'main'; yearBox.style.opacity = '0'; lexA.poseCutscene(t); cutCam(t); }
     var hz = Math.max(0, 1 - Math.abs(t - GLOBE_END) / 0.75); haze.style.opacity = String(Math.min(1, hz * 1.2));
