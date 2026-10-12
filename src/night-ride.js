@@ -92,7 +92,15 @@
   brand.appendChild(el('b', '', 'Witness Lexington')); var chapter = el('small', '', 'Dawn of April 19 · reconstructed opening'); brand.appendChild(chapter);
   var notebookButton = button('Notebook', notebook, 'notebook');
   var pauseButton = button('Pause', function () { setPaused(!paused); }, 'pause');
-  tools.append(notebookButton, pauseButton); top.append(brand, tools); host.appendChild(top);
+  var musicButton = button('Mute music', function () { music.toggle(); }, 'music');
+  var music = window.WL_MUSIC(function (s) {
+    musicButton.setAttribute('aria-pressed', String(s.muted));
+    musicButton.disabled = s.unavailable;
+    musicButton.title = s.unavailable ? 'Music is unavailable in this browser.' : s.started ? 'Synthesized background music' : 'Music starts when you begin or resume a run.';
+  });
+  musicButton.setAttribute('aria-pressed', 'false');
+  musicButton.title = 'Music starts when you begin or resume a run.';
+  tools.append(notebookButton, pauseButton, musicButton); top.append(brand, tools); host.appendChild(top);
   var panel = el('section', 'panel'), objective = el('p'), route = el('div', 'row route'), actionRow = el('div', 'row');
   var interactButton = button('Talk with Revere · E', interact, 'interact', true);
   var feedback = el('small'); feedback.setAttribute('role', 'status');
@@ -103,6 +111,7 @@
   var dialog = document.createElement('dialog'); host.appendChild(dialog);
   dialog.addEventListener('close', function () {
     clearMovement();
+    placeMusic();
     if (modalReturn && modalReturn.isConnected && !modalReturn.disabled && modalReturn.getClientRects().length) modalReturn.focus();
     else if (playable()) interactButton.focus();
     modalReturn = null;
@@ -117,7 +126,7 @@
   function closeControl() {
     var row = el('div', 'close');
     Array.from(dialog.children).filter(function (n) { return n.tagName === 'BUTTON' && n.className === 'primary'; }).forEach(function (n) { row.appendChild(n); });
-    row.appendChild(button('Close', function () { dialog.close(); }, 'close-dialog')); dialog.appendChild(row);
+    row.appendChild(button('Close', function () { dialog.close(); }, 'close-dialog')); row.appendChild(musicButton); dialog.appendChild(row);
   }
   function sourceNote(parent, text, id) { paragraph(parent, text + ' ' + id, 'tag'); }
   function notebook() {
@@ -177,7 +186,11 @@
     Array.from(card.children).forEach(function (n) { (n.tagName === 'BUTTON' ? actions : body).appendChild(n); });
     card.append(body, actions);
   }
-  function render() { draw(); splitCard(); }
+  function placeMusic() {
+    var footer = dialog.open ? dialog.querySelector('.close') : !overlay.hidden ? card.querySelector('.card-actions') : tools;
+    if (footer) footer.appendChild(musicButton);
+  }
+  function render() { tools.appendChild(musicButton); draw(); splitCard(); placeMusic(); }
   function draw() {
     panel.classList.toggle('is-caption', state.phase === 'opening');
     chapter.textContent = ['intro', 'opening', 'blackout'].includes(state.phase) ? 'Dawn of April 19 · reconstructed opening' : later() ? modern() ? 'Modern study · evidence and answer' : 'Lexington Green · reconstructed scene' : ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
@@ -195,8 +208,8 @@
       showCard('Witness Lexington', 'A warning in the night. A question at dawn. Play Eli, a fictional 12-year-old Lexington resident.', 'Night alarm, dawn muster, Green, and investigation');
       card.classList.add('is-title'); card.querySelector('h1').replaceChildren(el('span', 'title-kicker', 'Witness'), el('span', '', ' '), el('span', 'title-main', 'Lexington'));
       paragraph(card, 'Your errands are dramatized. Historical context has source labels in your notebook. No combat or timer.');
-      var start = button('Begin the opening', function () { go('opening'); }, 'begin', true); card.appendChild(start);
-      if (saved) card.appendChild(button('Resume saved run', function () { state = JSON.parse(JSON.stringify(saved)); go(state.phase); }, 'load'));
+      var start = button('Begin the opening', function () { music.start(); go('opening'); }, 'begin', true); card.appendChild(start);
+      if (saved) card.appendChild(button('Resume saved run', function () { music.start(); state = JSON.parse(JSON.stringify(saved)); go(state.phase); }, 'load'));
     } else if (state.phase === 'opening') {
       panel.hidden = false; route.replaceChildren(); actionRow.hidden = true; notice.hidden = true;
       route.appendChild(button('Skip to rewind', function () { go('blackout'); }, 'skip'));
@@ -412,7 +425,7 @@
   }
   slice = S.create({ W: W, lex: lex, card: card, panel: panel, overlay: overlay, actionRow: actionRow, notice: notice,
     route: route, objective: objective, interactButton: interactButton, el: el, paragraph: paragraph, button: button, setText: setText,
-    showCard: showCard, go: go, notebook: notebook, restart: restart, save: save,
+    showCard: showCard, placeMusic: placeMusic, go: go, notebook: notebook, restart: restart, save: save,
     state: function () { return state; }, target: function () { return target; }, setTarget: function (t) { target = t; },
     elapsed: function () { return elapsed; }, tick: function (dt) { elapsed += dt; }
   });

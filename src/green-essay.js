@@ -48,12 +48,13 @@
     function g() { return env.state().green; }
     function p() { return env.state().phase; }
     function add(text, cls) { env.paragraph(body, text, cls); }
-    function b(text, fn, id, primary) { var n = env.button(text, fn, id, primary); actions.appendChild(n); return n; }
+    function b(text, fn, id, primary) { var n = env.button(text, fn, id, primary); actions.appendChild(n); env.placeMusic(); return n; }
     function showCard(title, text) {
       env.showCard(title, text);
       body = env.el('div', 'card-scroll'); actions = env.el('div', 'card-actions');
       Array.from(env.card.children).forEach(function (n) { body.appendChild(n); });
       env.card.append(body, actions);
+      env.placeMusic();
     }
     function save() { env.save(); }
     function revealResult(result) {

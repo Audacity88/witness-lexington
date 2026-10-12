@@ -89,7 +89,7 @@ try {
       await click('#close-dialog');
       await click('#travel-' + order[0]); await click('#pause'); const before = await snapshot();
       await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift');
-      check('Pause keeps keyboard focus in its overlay', await page.evaluate(() => document.activeElement.id === 'resume'));
+      check('Pause keeps keyboard focus in its overlay', await page.evaluate(() => document.activeElement.id === (document.getElementById('music').disabled ? 'resume' : 'music')));
       await new Promise(r => setTimeout(r, 200));
       check('Pause freezes walking', JSON.stringify((await snapshot()).run.dawn) === JSON.stringify(before.run.dawn));
       await click('#resume'); await click('#travel-' + order[0]); await click('#notebook'); const note = await snapshot();

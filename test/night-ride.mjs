@@ -51,7 +51,7 @@ try {
       if (width === 960) {
         await click('#pause'); const before = await snapshot();
         await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift');
-        check('Pause traps keyboard focus', await page.evaluate(() => document.activeElement.id === 'resume'));
+        check('Pause traps keyboard focus', await page.evaluate(() => document.activeElement.id === (document.getElementById('music').disabled ? 'resume' : 'music')));
         await new Promise(r => setTimeout(r, 200));
         check('Opening pauses its clock', (await snapshot()).elapsed === before.elapsed);
         await click('#resume'); await phase('blackout');
