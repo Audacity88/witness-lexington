@@ -803,23 +803,39 @@
     var pinLab = labelSprite('Lexington · AD 1775'); pinLab.position.set(0, 0, 0.1); pin.add(pinLab);
     pin.position.copy(ll2v(LEX.lat, LEX.lon, 1.002)); pin.lookAt(ll2v(LEX.lat, LEX.lon, 2)); globe.add(pin);
     var START = { lat: 18, lon: -5 };
-    // u: 0..1 — spin from 413 BC to AD 1775, rotating ~1 turn per year (2187 years total)
+    var lastU = 0, displayLon = START.lon;  // Track smooth display longitude separate from logical year
+    var MAX_DEG_PER_FRAME = 90;  // Cap visible rotation to avoid aliasing (at 60fps: 90°/frame = 5,400°/s = 15 rps)
+    // u: 0..1 — spin from 413 BC to AD 1775, ~1 turn per year (2187 years total)
+    // Year counter is accurate; visible rotation is rate-limited to prevent strobing
     function placeGlobe(u) {
-      var S = ease(u), turns = YEAR_SPAN, dLon = (LEX.lon - START.lon) - 360 * turns;
-      var lon = START.lon + dLon * S, lat = START.lat + (LEX.lat - START.lat) * S;
-      globe.rotation.set(lat * D2R, -lon * D2R, 0, 'XYZ');
+      var S = ease(u);
+      // Calculate logical target position (includes all 2187 turns)
+      var turns = YEAR_SPAN, targetLon = START.lon + ((LEX.lon - START.lon) - 360 * turns) * S;
+      var lat = START.lat + (LEX.lat - START.lat) * S;
+      // Smooth the visible rotation to prevent aliasing: cap angular change per call
+      var deltaU = u - lastU; lastU = u;
+      if (deltaU > 0 && u > 0.001 && u < 0.999) {  // Only rate-limit during the spin, not at endpoints
+        var delta = targetLon - displayLon;
+        // Normalize delta to [-180, 180] range
+        while (delta > 180) delta -= 360;
+        while (delta < -180) delta += 360;
+        // Cap the angular change
+        var maxChange = MAX_DEG_PER_FRAME;
+        if (Math.abs(delta) > maxChange) {
+          delta = delta > 0 ? maxChange : -maxChange;
+        }
+        displayLon += delta;
+      } else {
+        displayLon = targetLon;  // Snap to target at start/end for exact landing
+      }
+      globe.rotation.set(lat * D2R, -displayLon * D2R, 0, 'XYZ');
       var alt = 0.3 + 2.4 * (1 - ease(clamp01((u - 0.35) / 0.65)));
       gCam.position.set(0, 0, 1 + alt); gCam.lookAt(0, 0, 0);
       var ps = 0.2 + alt * 0.95, far = clamp01((alt - 0.5) / 0.8);
       pin.children[0].scale.setScalar(ps); pinDot.scale.set(0.05 * ps, 0.05 * ps, 1);
       pinLab.material.opacity = far; pinLab.scale.set(0.42 * ps * 0.55, 0.08 * ps * 0.55, 1); pinLab.position.z = 0.06 * ps;
       globe.updateMatrixWorld(true); var wp = new T.Vector3(); pin.getWorldPosition(wp); pinLab.visible = wp.z > 0.25 && far > 0.01; pinDot.visible = wp.z > 0;
-      // Apply motion blur during high-speed rotation (peak velocity ~0.3-0.7)
-      var speedFactor = Math.abs(Math.sin(Math.PI * S)); // peaks at 0.5, tapers at ends
-      var blurAmount = clamp01(speedFactor * 2.2 - 0.15); // threshold to avoid blur at start/end
-      earth.material.opacity = lerp(1, 0.35, blurAmount);
-      earth.material.transparent = blurAmount > 0.01;
-      // Return current year for display
+      // Year counter still reflects the full 2187-year span
       var year = Math.round(SYRACUSE_YEAR + YEAR_SPAN * S);
       return { year: year, yearText: fmtYear(year) };
     }
