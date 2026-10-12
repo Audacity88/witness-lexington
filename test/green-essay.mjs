@@ -123,7 +123,7 @@ try {
       await page.select('#aftermath','fewshots');await click('#check-hypothesis');await click('#write-essay');await phase('essay');
       // Starting outside the overlay, Tab must reach the textarea, then wrap all controls.
       await page.evaluate(()=>document.activeElement.blur());await page.keyboard.press('Tab');check('Keyboard reaches essay',await page.evaluate(()=>document.activeElement.id==='essay-text'));
-      await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift');check('Reverse Tab wraps',await page.evaluate(()=>document.activeElement.id==='essay-notebook'));await page.keyboard.press('Tab');
+      await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift');check('Reverse Tab wraps',await page.evaluate(()=>document.activeElement.id===(document.getElementById('music').disabled?'essay-notebook':'music')));await page.keyboard.press('Tab');
       await typeAnswer('I believe the regulars fired first.');await click('#check-essay');check('Short unsupported essay fails',await page.$('#finish-investigation')===null);await shot('essay-failed');
       const blocked=await page.$eval('#essay-text',ta=>{
         const before=ta.value;const events=[new Event('paste',{bubbles:true,cancelable:true}),new Event('drop',{bubbles:true,cancelable:true}),new InputEvent('beforeinput',{bubbles:true,cancelable:true,inputType:'insertFromPaste',data:'Outside words'})];

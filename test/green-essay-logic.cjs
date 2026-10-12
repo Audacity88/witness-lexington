@@ -21,8 +21,8 @@ function boot(storage={}){
  const events={}, canvas=new Element('canvas',doc);host.append(canvas);let callback,now=0,cutPoses=0;
  const night={scene:{},horse:{position:{set(){}},rotation:{}},legs:Array.from({length:4},()=>({rotation:{}})),rings:Array.from({length:3},()=>({material:{color:{set(){}}}}))};
  const ctx={document:doc,console,performance:{now:()=>now},localStorage:{getItem:k=>storage[k]||null,setItem:(k,v)=>storage[k]=v,removeItem:k=>delete storage[k]},
- requestAnimationFrame:fn=>callback=fn,ResizeObserver:class{observe(){}},THREE:{},addEventListener:(k,fn)=>(events[k]??=[]).push(fn),WGWorld:{create:()=>({canvas,cam:{position:{set(){}},lookAt(){},updateProjectionMatrix(){}},renderer:{setSize(){},render(){}},makeNight:()=>night,makeLex:()=>({scene:{},regs:[],horse:{},poseCutscene(){cutPoses++}}),makeDawn:()=>({scene:{},group:{},rings:[],pose(){}}),makeGreen:()=>({group:{},pose(){}})})}};
- ctx.window=ctx;vm.createContext(ctx);for(const file of ['data/night-ride.js','data/dawn-muster.js','data/evidence.js','data/essay-rules.js','data/green.js','src/evidence-check.js','src/green-essay.js','src/night-ride.js'])vm.runInContext(fs.readFileSync(ROOT+file,'utf8'),ctx,{filename:file});
+ requestAnimationFrame:fn=>callback=fn,clearInterval(){},ResizeObserver:class{observe(){}},THREE:{},addEventListener:(k,fn)=>(events[k]??=[]).push(fn),WGWorld:{create:()=>({canvas,cam:{position:{set(){}},lookAt(){},updateProjectionMatrix(){}},renderer:{setSize(){},render(){}},makeNight:()=>night,makeLex:()=>({scene:{},regs:[],horse:{},poseCutscene(){cutPoses++}}),makeDawn:()=>({scene:{},group:{},rings:[],pose(){}}),makeGreen:()=>({group:{},pose(){}})})}};
+ ctx.window=ctx;vm.createContext(ctx);for(const file of ['data/night-ride.js','data/dawn-muster.js','data/evidence.js','data/essay-rules.js','data/green.js','src/evidence-check.js','src/green-essay.js','src/music.js','src/night-ride.js'])vm.runInContext(fs.readFileSync(ROOT+file,'utf8'),ctx,{filename:file});
  function frame(ms=50){now+=ms;const cb=callback;callback=null;cb(now);}
  function frames(n,ms=50){for(let i=0;i<n;i++)frame(ms);}
  function click(id){const n=doc.getElementById(id);assert(n,'exists '+id);assert(!n.disabled,'enabled '+id);n.focus();n.dispatch('click');}
@@ -63,7 +63,12 @@ for(const spot of ['corner','edge']) {
  check('Shelter checkpoint survives refresh '+spot,()=>{g=reload(g);assert.equal(g.snap().run.phase,'shelter');assert(g.doc.getElementById('enter-study'));assert(g.snap().run.green.sheltered);});
  g.click('shelter-notebook');check('Notebook separates Green from sources '+spot,()=>assert(g.host.querySelector('dialog').textContent.includes('not primary testimony')));g.click('close-dialog');g.click('enter-study');
  check('Ranking unavailable until all sources inspected '+spot,()=>assert(!g.doc.getElementById('rank-0')));
- for(const c of g.ctx.WG_DATA.cards){select(g,'document',c.id);if(c.id==='revere1775')assert(g.host.querySelector('.card').textContent.includes('Document paraphrase: Revere says'));g.click('inspect');assert(g.doc.getElementById('inspect').disabled);}
+ check('Music control survives document changes and notebook modal '+spot,()=>{
+   g.click('next-document');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
+   g.click('study-notebook');assert(g.host.querySelector('dialog').contains(g.doc.getElementById('music')));
+   g.click('close-dialog');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
+ });
+ for(const c of g.ctx.WG_DATA.cards){select(g,'document',c.id);if(c.id==='revere1775')assert(g.host.querySelector('.card').textContent.includes('Document paraphrase: Revere says'));g.click('inspect');assert(g.doc.getElementById('inspect').disabled);assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));}
  check('Both accounts and Doolittle framing inspected '+spot,()=>{assert.equal(g.snap().run.green.inspected.length,9);select(g,'document','doolittle');assert(g.host.textContent.includes('artist pictured'));});
  select(g,'rank-0','barker');select(g,'rank-1','barker');
  check('Duplicate ranking cannot continue '+spot,()=>assert(g.doc.getElementById('choose-belief').disabled));

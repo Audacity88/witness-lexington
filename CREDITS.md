@@ -62,6 +62,7 @@ WL-D1 corrects this register and defines replacement content; it does not alter 
 - three.js r186 + OrbitControls, bundled locally (no CDN).
 - Coastline data: Natural Earth 1:50m land (public domain).
 - UI typefaces, bundled locally as Latin subsets in `assets/fonts/` (no web-font requests): IM Fell English SC, the Fell Types digitally reproduced by Igino Marini, and Libre Caslon Text, copyright 2018 The Libre Caslon Text Project Authors (Pablo Impallari et al.), both under the SIL Open Font License 1.1 (`assets/fonts/OFL-IMFellEnglishSC.txt`, `assets/fonts/OFL-LibreCaslonText.txt`). The UI art direction is in `UI_STYLE.md`.
+- WL-DEMO2 music: a public-domain Yankee Doodle melody phrase with an original synthesized fife-and-drum-style accompaniment in `src/music.js`. All audio is generated with Web Audio; no recording or downloaded asset is used. Decorative background music, not historical scene evidence.
 
 ### WL-S3 displayed script register
 

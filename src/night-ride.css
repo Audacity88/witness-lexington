@@ -69,7 +69,11 @@
 /* ---------- HUD ---------- */
 .wl .top { position:absolute; inset:12px 14px auto; z-index:2; display:flex; justify-content:space-between; gap:12px; align-items:start; pointer-events:none; }
 .wl .top > * { pointer-events:auto; }
+.wl .top .brand { min-width:0; }
 .wl .top .row { gap:12px; padding:0 4px 4px 0; }
+.wl .top > .row { flex-shrink:0; flex-wrap:nowrap; }
+.wl #music { white-space:nowrap; }
+.wl #music[aria-pressed="true"] { background:var(--navy); color:var(--paper-hi); }
 .wl .brand { padding:7px 16px 8px; }
 .wl .brand b { display:block; font:400 19px/1.1 var(--display); letter-spacing:.02em; }
 .wl .brand small { display:block; font-size:14px; line-height:1.3; }
