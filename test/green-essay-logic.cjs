@@ -66,6 +66,8 @@ for(const spot of ['corner','edge']) {
  check('Music control survives document changes and notebook modal '+spot,()=>{
    g.click('next-document');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
    g.click('study-notebook');assert(g.host.querySelector('dialog').contains(g.doc.getElementById('music')));
+   g.doc.getElementById('music').dispatch('click');assert.equal(g.doc.getElementById('music').textContent,'Play music');assert.equal(g.doc.getElementById('music')['aria-pressed'],'true');
+   g.doc.getElementById('music').dispatch('click');assert.equal(g.doc.getElementById('music').textContent,'Mute music');assert.equal(g.doc.getElementById('music')['aria-pressed'],'false');
    g.click('close-dialog');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
  });
  for(const c of g.ctx.WG_DATA.cards){select(g,'document',c.id);if(c.id==='revere1775')assert(g.host.querySelector('.card').textContent.includes('Document paraphrase: Revere says'));g.click('inspect');assert(g.doc.getElementById('inspect').disabled);assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));}

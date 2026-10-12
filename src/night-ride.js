@@ -95,6 +95,7 @@
   var musicButton = button('Mute music', function () { music.toggle(); }, 'music');
   var music = window.WL_MUSIC(function (s) {
     musicButton.setAttribute('aria-pressed', String(s.muted));
+    musicButton.textContent = s.muted ? 'Play music' : 'Mute music';
     musicButton.disabled = s.unavailable;
     musicButton.title = s.unavailable ? 'Music is unavailable in this browser.' : s.started ? 'Synthesized background music' : 'Music starts when you begin or resume a run.';
   });
@@ -190,7 +191,7 @@
     var footer = dialog.open ? dialog.querySelector('.close') : !overlay.hidden ? card.querySelector('.card-actions') : tools;
     if (footer) footer.appendChild(musicButton);
   }
-  function render() { tools.appendChild(musicButton); draw(); splitCard(); placeMusic(); }
+  function render() { music.scene(state.phase); tools.appendChild(musicButton); draw(); splitCard(); placeMusic(); }
   function draw() {
     panel.classList.toggle('is-caption', state.phase === 'opening');
     chapter.textContent = ['intro', 'opening', 'blackout'].includes(state.phase) ? 'Dawn of April 19 · reconstructed opening' : later() ? modern() ? 'Modern study · evidence and answer' : 'Lexington Green · reconstructed scene' : ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';

@@ -187,3 +187,16 @@ Three sizes are the contract: 662x418 (the embed widget), 960x540, and 1280x720.
 - Body text is at least 14px.
 
 Short screens (450px tall or less) tighten padding and step type down, without going below 14px.
+
+
+## Music toggle and soundtrack
+
+The existing music button stays in the HUD during travel and in the fixed action footer during overlays and dialogs. It uses the existing button styles, keyboard focus, and 44px minimum target. No container or spacing changes are required.
+
+- **Mute music** silences the soundtrack and changes the label to **Play music**. `aria-pressed="true"` means muted. **Play music** restores sound and the original label. The two labels have the same character count to limit footer growth at 662x418.
+- Music starts only after Begin or Resume. Muting is a session preference, separate from saved game progress. Hidden tabs and page exits suspend the audio clock. An unavailable audio device disables the button and supplies an explanatory tooltip.
+- Four public-domain tune excerpts rotate through a shuffled playlist, with no immediate repeats, including across playlist refills and scene changes. Each completed tune is followed by 20–40 seconds of silence. A scene change fades the old voices and preserves a current rest or adds a full rest after an interrupted tune.
+- Night uses sparse lower-register fiddle or harpsichord with quiet open fifths. Muster uses fife or fiddle over bass drum and snare pulses. The Green uses slower, quiet fiddle or fife without drums. Study uses quiet harpsichord or fiddle with keyboard accompaniment. Successive tunes vary their lead instrument and tempo.
+- The opening, blackout, and first-shot observation sequence remain silent. This decorative soundtrack supplies no testimony, directional shot cue, or historical faction signal. Tune references are in `CREDITS.md`.
+
+Reviewer acceptance includes both mute states in travel, notebook, pause, evidence, and essay footers at 1280x720 and 662x418. Run `node test/ui-shots.mjs <loopback url> <outdir> 1280x720,662x418`, then check the muted label and listen for timbre, balance, scene changes, and rests. Browser checks remain reviewer-owned under `WORK_INSTRUCTIONS.md`.

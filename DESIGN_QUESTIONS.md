@@ -84,3 +84,13 @@ These defaults belong to WL-D1. They remain open for Dan and do not create mid-b
 | ID | Question | Options | Default chosen | Why |
 | --- | --- | --- | --- | --- |
 | DQ-47 | When and where should background music play? | Autoplay; start after Begin/Resume; per-scene audio | Start a quiet synthesized Yankee Doodle phrase after Begin or Resume, loop across scenes, suspend in hidden tabs, and keep a session-only mute toggle in the active HUD or modal footer | Requires a player gesture, uses no external assets, and keeps the same keyboard-focusable control reachable through overlays and dialogs. This is decorative music, not a reconstruction of sounds heard at Lexington. |
+
+
+## WL-MUSIC2 soundtrack defaults
+
+| ID | Question | Options | Default chosen | Why |
+| --- | --- | --- | --- | --- |
+| DQ-48 | Which tunes and arrangements replace the single loop? | Four to six period tunes; recorded tracks; one longer loop | Four public-domain tune excerpts: Yankee Doodle, The British Grenadiers, Petzold's Minuet in G, and the French air Ah! vous dirai-je, maman. Newly arranged Web Audio fife, drums, fiddle, and harpsichord, with scene-dependent tempo and density | Meets the card's minimum repertoire with compact note data and no downloaded assets. The French air supplies a slow-air arrangement. Credits identify the original music rather than borrowing a modern recording or arrangement. |
+| DQ-49 | How should the playlist handle silence and scene changes? | Continuous looping; independent scene loops; shuffled playlist with rests | Each shuffled bag visits all four tunes; no immediate repeat at refill or scene change; 20–40-second rests after tunes. Preserve a current rest or insert a full rest after interrupting a tune | Prevents the repeated single-phrase experience and leaves quiet space during dialogue and reading. Muted or hidden time freezes the audio clock. |
+| DQ-50 | May music continue through the opening and first-shot observation? | Continuous background; directional musical effects; silence at the pivot | Keep intro, opening, blackout, and green-event silent. Night is sparse, muster has drums, Green travel and shelter are somber, and study is quiet | Preserves the existing silent pivot and avoids musical cues that could imply a shooter or faction. No historical dialogue or scoring changes. |
+| DQ-51 | What should the muted button say? | Keep Mute music; Unmute music; Play music | Change Mute music to Play music while muted and retain aria-pressed semantics and current button placement | States the action and keeps the label's character count equal to the existing control. Browser layout verification remains reviewer-owned. |
