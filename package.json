@@ -4,7 +4,7 @@
   "description": "Witness Lexington: a static three.js history game. No runtime dependencies; devDependencies drive the headless UI audit.",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node test/green-essay-logic.cjs && node test/green-world.cjs && node test/dist-v2.cjs",
+    "test": "node test/music.cjs && node test/green-essay-logic.cjs && node test/green-world.cjs && node test/dist-v2.cjs",
     "ui-shots": "node test/ui-shots.mjs"
   },
   "devDependencies": {

@@ -22,7 +22,10 @@ function boot(storage={}){
  const night={scene:{},horse:{position:{set(){}},rotation:{}},legs:Array.from({length:4},()=>({rotation:{}})),rings:Array.from({length:3},()=>({material:{color:{set(){}}}}))};
  const ctx={document:doc,console,performance:{now:()=>now},localStorage:{getItem:k=>storage[k]||null,setItem:(k,v)=>storage[k]=v,removeItem:k=>delete storage[k]},
  requestAnimationFrame:fn=>callback=fn,clearInterval(){},ResizeObserver:class{observe(){}},THREE:{},addEventListener:(k,fn)=>(events[k]??=[]).push(fn),WGWorld:{create:()=>({canvas,cam:{position:{set(){}},lookAt(){},updateProjectionMatrix(){}},renderer:{setSize(){},render(){}},makeNight:()=>night,makeLex:()=>({scene:{},regs:[],horse:{},poseCutscene(){cutPoses++}}),makeDawn:()=>({scene:{},group:{},rings:[],pose(){}}),makeGreen:()=>({group:{},pose(){}})})}};
- ctx.window=ctx;vm.createContext(ctx);for(const file of ['data/night-ride.js','data/dawn-muster.js','data/evidence.js','data/essay-rules.js','data/green.js','src/evidence-check.js','src/green-essay.js','src/music.js','src/night-ride.js'])vm.runInContext(fs.readFileSync(ROOT+file,'utf8'),ctx,{filename:file});
+ ctx.window=ctx;vm.createContext(ctx);for(const file of ['data/night-ride.js','data/dawn-muster.js','data/evidence.js','data/essay-rules.js','data/green.js','src/evidence-check.js','src/green-essay.js','src/music.js','src/night-ride.js']){
+  if(file==='src/night-ride.js'){const createMusic=ctx.WL_MUSIC;ctx.WL_MUSIC=changed=>{ctx.music=createMusic(changed);return ctx.music;};}
+  vm.runInContext(fs.readFileSync(ROOT+file,'utf8'),ctx,{filename:file});
+ }
  function frame(ms=50){now+=ms;const cb=callback;callback=null;cb(now);}
  function frames(n,ms=50){for(let i=0;i<n;i++)frame(ms);}
  function click(id){const n=doc.getElementById(id);assert(n,'exists '+id);assert(!n.disabled,'enabled '+id);n.focus();n.dispatch('click');}
@@ -36,6 +39,19 @@ function boot(storage={}){
 function walk(n){return [n,...n.children.flatMap(walk)];}
 const checks=[];function check(name,fn){fn();checks.push(name);}
 const KEY='witness-lexington-s1-v1';
+check('Game Pause forwards audio pause without changing the music label',()=>{
+ const game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');game.click('pause');
+ assert(game.snap().paused);assert(game.ctx.music.status().paused);assert(!game.ctx.music.status().muted);
+ assert.equal(game.doc.getElementById('music').textContent,'Mute music');
+ assert.equal(game.doc.getElementById('music')['aria-label'],'Mute music');
+ game.click('resume');assert(!game.ctx.music.status().paused);
+});
+check('Game Resume preserves a muted preference',()=>{
+ const game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');game.click('pause');game.doc.getElementById('music').dispatch('click');game.click('resume');
+ assert(!game.snap().paused);assert(!game.ctx.music.status().paused);assert(game.ctx.music.status().muted);
+ assert.equal(game.doc.getElementById('music').textContent,'Play music');
+ assert.equal(game.doc.getElementById('music')['aria-label'],'Play music');
+});
 function alarm(g) { g.click('begin');g.click('skip');g.click('rewind');g.click('start-ride');g.click('interact');g.click('ask-source');g.click('accept');for(const id of ['lantern','orchard']){g.travel(id,id==='lantern'?28:10);g.click('record-alarm');}g.travel('parsonage',44); }
 function muster(g) {g.click('continue-dawn');g.click('start-muster');g.click('interact');g.click('accept-message');for(const id of ['near','far']){g.walkTo(id);g.click('record-listening');}g.walkTo('militia');g.click('deliver-message');g.click('ask-militia');g.click('close-dialog');g.walkTo('town');g.click('ask-town');g.click('close-dialog');g.walkTo('boundary');g.click('finish-muster');}
 function walkGreen(g,id) { g.click('travel-'+id);let n=0;while(g.snap().assisted&&n++<800)g.frame();assert(n<800);g.click('interact'); }
@@ -66,6 +82,8 @@ for(const spot of ['corner','edge']) {
  check('Music control survives document changes and notebook modal '+spot,()=>{
    g.click('next-document');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
    g.click('study-notebook');assert(g.host.querySelector('dialog').contains(g.doc.getElementById('music')));
+   g.doc.getElementById('music').dispatch('click');assert.equal(g.doc.getElementById('music').textContent,'Play music');assert.equal(g.doc.getElementById('music')['aria-label'],'Play music');assert.equal(g.doc.getElementById('music')['aria-pressed'],'true');
+   g.doc.getElementById('music').dispatch('click');assert.equal(g.doc.getElementById('music').textContent,'Mute music');assert.equal(g.doc.getElementById('music')['aria-label'],'Mute music');assert.equal(g.doc.getElementById('music')['aria-pressed'],'false');
    g.click('close-dialog');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
  });
  for(const c of g.ctx.WG_DATA.cards){select(g,'document',c.id);if(c.id==='revere1775')assert(g.host.querySelector('.card').textContent.includes('Document paraphrase: Revere says'));g.click('inspect');assert(g.doc.getElementById('inspect').disabled);assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));}

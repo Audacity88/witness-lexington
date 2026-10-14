@@ -4,6 +4,8 @@ import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
 import path from 'node:path';
 const [,, url, outdir = '/tmp/wl-ui-shots', sizeList = '1280x720,960x540,662x418'] = process.argv;
+const colorScheme = process.env.WL_UI_COLOR_SCHEME || 'light';
+if (!['light', 'dark'].includes(colorScheme)) throw new Error('WL_UI_COLOR_SCHEME must be light or dark.');
 if (!url || !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname)) throw new Error('Supply a loopback test URL.');
 const executablePath = process.env.CHROME_BIN || ['/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(p => fs.existsSync(p));
 fs.mkdirSync(outdir, { recursive: true });
@@ -78,6 +80,11 @@ function audit() {
     if (!shown(e) || e.closest('[hidden]')) return;
     const r = e.getBoundingClientRect(); if (r.height < 44 || r.width < 44) out.small.push((e.id || e.textContent.trim()).slice(0, 40) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
   });
+  const footer = document.querySelector('dialog[open] .close');
+  if (footer) {
+    const tops = Array.from(footer.querySelectorAll('button')).map(button => button.getBoundingClientRect().top);
+    if (Math.max(...tops) - Math.min(...tops) > 1) out.wrapped.push('dialog footer uses multiple rows');
+  }
   root.querySelectorAll('p, span, small, label, button, a, h1, h2, h3, blockquote, b, li, select, textarea').forEach(e => {
     if (!shown(e) || e.closest('[hidden]') || !e.textContent.trim()) return;
     const size = parseFloat(getComputedStyle(e).fontSize); if (size < 14) out.tinyText.push(e.tagName + ' ' + size + ' ' + e.textContent.trim().slice(0, 30));
@@ -95,19 +102,42 @@ function audit() {
 try {
   for (const size of sizeList.split(',')) {
     const [width, height] = size.split('x').map(Number);
-    const page = await browser.newPage(), errors = [], external = [], audits = {};
+    const page = await browser.newPage(), errors = [], external = [], audits = {}, music = [];
+    await page.evaluateOnNewDocument(() => {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (Audio) window.AudioContext = class extends Audio {
+        constructor(...args) { super(...args); window.__wlAudio = this; }
+      };
+    });
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (['error', 'warn', 'assert'].includes(m.type())) errors.push(m.type() + ': ' + m.text()); });
     page.on('requestfailed', r => errors.push(r.url() + ': ' + r.failure()?.errorText));
     await page.setRequestInterception(true);
     page.on('request', r => { if (!r.url().startsWith(new URL(url).origin) && !/^(data|blob):/.test(r.url())) { external.push(r.url()); r.abort(); } else r.continue(); });
     await page.setViewport({ width, height });
+    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: colorScheme }]);
     const snap = () => page.evaluate(() => WitnessGame.snapshot());
     const click = async sel => { await page.waitForSelector(sel, { visible: true, timeout: 45000 }); await page.click(sel); };
     const phase = p => page.waitForFunction(p => WitnessGame.snapshot().run.phase === p, { timeout: 45000 }, p);
     const settle = ms => new Promise(r => setTimeout(r, ms));
     const shot = async name => { await settle(350); audits[name] = await page.evaluate(audit); await page.screenshot({ path: path.join(outdir, `${size}-${name}.png`) }); };
     const check = async name => { await settle(350); audits[name] = await page.evaluate(audit); };
+    const audioState = state => page.waitForFunction(state => window.__wlAudio && window.__wlAudio.state === state, { timeout: 5000 }, state);
+    async function musicStates(name) {
+      for (const [index, muted] of [false, true, false].entries()) {
+        if (index) await click('#music');
+        const state = await page.evaluate(() => {
+          const button = document.getElementById('music'), game = WitnessGame.snapshot();
+          return { label: button.textContent, accessibleLabel: button.getAttribute('aria-label'), muted: button.getAttribute('aria-pressed'), disabled: button.disabled,
+            paused: game.paused, phase: game.run.phase, footer: button.parentElement.className };
+        });
+        if (state.disabled || state.label !== (muted ? 'Play music' : 'Mute music') || state.accessibleLabel !== state.label || state.muted !== String(muted)) throw Error('Music toggle failed in ' + name);
+        const silent = muted || state.paused || ['intro', 'opening', 'blackout', 'green-event'].includes(state.phase);
+        await audioState(silent ? 'suspended' : 'running');
+        music.push({ name, ...state, audio: await page.evaluate(() => window.__wlAudio.state) });
+        await shot(name + (muted ? '-muted' : index ? '-restored' : '-unmuted'));
+      }
+    }
     const arrive = (fn, arg) => page.waitForFunction(fn, { timeout: 45000 }, arg);
     async function ride(id, z) { await click('#travel-' + id); await arrive(z => Math.abs(WitnessGame.snapshot().run.z - z) < 0.16 && !WitnessGame.snapshot().assisted, z); }
     async function walk(id) { await click('#travel-' + id); await arrive(id => { const s = WL_DAWN.stops.find(s => s.id === id), d = WitnessGame.snapshot(); return Math.hypot(d.run.dawn.x - s.x, d.run.dawn.z - s.z) < 0.13 && !d.assisted; }, id); }
@@ -120,40 +150,45 @@ try {
       await click('#begin'); await page.waitForFunction(() => WitnessGame.snapshot().elapsed >= 15, { timeout: 45000 }); await shot('02-opening');
       await click('#skip'); await shot('03-blackout');
       await click('#rewind'); await shot('04-rewind');
-      await click('#start-ride'); await click('#interact'); await click('#ask-source'); await shot('05-dialog-revere');
-      await click('#accept'); await ride('lantern', 28); await shot('06-ride-household');
+      await click('#start-ride'); await click('#interact'); await click('#ask-source'); await shot('05-dialog-revere'); await musicStates('05-dialog-revere-music');
+      await click('#accept'); await ride('lantern', 28); await shot('06-ride-household'); await musicStates('06-ride-music');
       await click('#interact'); await click('#record-alarm'); await ride('orchard', 10); await check('ride-orchard'); await click('#interact'); await click('#record-alarm');
       await ride('parsonage', 44); await click('#interact'); await phase('complete'); await shot('07-checkpoint');
       await click('#continue-dawn'); await click('#start-muster'); await shot('08-muster-parker');
       await click('#interact'); await shot('09-dialog-parker'); await click('#accept-message');
       await walk('near'); await shot('10-muster-listening-spot');
-      await click('#pause'); await shot('26-paused'); await click('#resume');
+      await click('#pause'); await audioState('suspended');
+      const pausedTime = await page.evaluate(() => window.__wlAudio.currentTime);
+      await shot('26-paused'); await settle(250);
+      if (await page.evaluate(() => window.__wlAudio.currentTime) !== pausedTime) throw Error('Pause advances the music clock');
+      await musicStates('26-paused-music'); await click('#music'); await click('#resume'); await audioState('suspended');
+      await shot('26-resumed-muted'); await click('#music'); await audioState('running'); await shot('26-resumed-unmuted');
       await click('#interact'); await shot('11-dialog-listening'); await click('#record-listening');
       await walk('far'); await check('muster-at-far'); await click('#interact'); await click('#record-listening');
       await walk('militia'); await check('muster-at-militia'); await click('#interact'); await click('#deliver-message'); await click('#ask-militia'); await shot('12-dialog-militiaman'); await click('#close-dialog');
       await walk('town'); await check('muster-at-town'); await click('#interact'); await click('#ask-town'); await click('#close-dialog');
       await walk('boundary'); await shot('27-muster-boundary'); await click('#interact'); await click('#finish-muster'); await phase('muster-complete');
-      await click('#continue-green'); await phase('green'); await shot('13-green-spots');
+      await click('#continue-green'); await phase('green'); await shot('13-green-spots'); await musicStates('13-green-music');
       await walkGreen('edge'); await check('green-at-edge'); await walkGreen('corner'); await check('green-at-corner'); await click('#interact'); await phase('green-event');
       await page.waitForFunction(() => WitnessGame.snapshot().elapsed >= 7, { timeout: 45000 }); await shot('14-green-caption');
       await click('#to-shelter'); await walkGreen('shelter'); await click('#interact'); await shot('15-shelter');
-      await click('#enter-study'); await phase('study'); await shot('16-evidence-room');
+      await click('#enter-study'); await phase('study'); await shot('16-evidence-room'); await musicStates('16-evidence-music');
       await page.select('#document', 'doolittle'); await shot('17-evidence-doolittle');
       for (const id of await page.evaluate(() => WG_DATA.cards.map(c => c.id))) { await page.select('#document', id); await click('#inspect'); }
       await page.select('#rank-0', 'barker'); await page.select('#rank-1', 'revere1775');
       await click('#limitation'); await page.keyboard.type('The diary gives one observer\u2019s account and cannot establish every view.');
       await page.$eval('.card-scroll', e => { e.scrollTop = e.scrollHeight; }); await shot('18-evidence-ranking');
-      await click('#study-notebook'); await shot('19-notebook'); await click('#close-dialog');
+      await click('#study-notebook'); await shot('19-notebook'); await musicStates('19-notebook-music'); await click('#close-dialog');
       await click('#choose-belief'); await shot('20-belief'); await click('#belief-unsure'); await phase('hypothesis');
       await click('#check-hypothesis'); await shot('21-hypothesis-fits');
       await page.select('#aftermath', 'stopped'); await click('#check-hypothesis'); await shot('22-hypothesis-contradicts');
       await page.select('#aftermath', 'fewshots'); await click('#check-hypothesis'); await click('#write-essay'); await phase('essay');
-      await shot('23-essay-empty');
+      await shot('23-essay-empty'); await musicStates('23-essay-music');
       await click('#essay-text'); await page.keyboard.type(essay, { delay: 45 }); await click('#check-essay'); await shot('24-essay-checked');
       if (await page.$('#finish-investigation')) { await click('#finish-investigation'); await phase('finished'); await shot('25-finished'); }
     } catch (e) { failure = e.message; await page.screenshot({ path: path.join(outdir, `${size}-failure.png`) }); }
     const problems = Object.fromEntries(Object.entries(audits).map(([k, a]) => [k, Object.fromEntries(Object.entries(a).filter(([, v]) => v.length))]).filter(([, a]) => Object.keys(a).length));
-    reports.push({ size, failure, errors, external, problems, shots: Object.keys(audits).length });
+    reports.push({ size, colorScheme, failure, errors, external, problems, music, shots: Object.keys(audits).length });
     await page.close();
   }
 } finally { await browser.close(); }

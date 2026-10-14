@@ -62,7 +62,20 @@ WL-D1 corrects this register and defines replacement content; it does not alter 
 - three.js r186 + OrbitControls, bundled locally (no CDN).
 - Coastline data: Natural Earth 1:50m land (public domain).
 - UI typefaces, bundled locally as Latin subsets in `assets/fonts/` (no web-font requests): IM Fell English SC, the Fell Types digitally reproduced by Igino Marini, and Libre Caslon Text, copyright 2018 The Libre Caslon Text Project Authors (Pablo Impallari et al.), both under the SIL Open Font License 1.1 (`assets/fonts/OFL-IMFellEnglishSC.txt`, `assets/fonts/OFL-LibreCaslonText.txt`). The UI art direction is in `UI_STYLE.md`.
-- WL-DEMO2 music: a public-domain Yankee Doodle melody phrase with an original synthesized fife-and-drum-style accompaniment in `src/music.js`. All audio is generated with Web Audio; no recording or downloaded asset is used. Decorative background music, not historical scene evidence.
+- WL-MUSIC2 soundtrack: four public-domain melodies, abbreviated and newly arranged in `src/music.js`. Web Audio generates fife, drum, fiddle, and harpsichord timbres. No recording, sample library, or downloaded asset is used. These arrangements are decorative background music, not evidence of music heard at Lexington. The opening and first-shot sequence remain silent.
+
+### WL-MUSIC2 tune credits
+
+These references identify the underlying public-domain music. The game uses original short instrumental arrangements rather than a facsimile transcription or a modern copyrighted arrangement. Print references are supplied for content review; no source was fetched during this offline card.
+
+| Tune / code ID | Attribution and source reference |
+| --- | --- |
+| Yankee Doodle / `yankee-doodle` | Traditional tune in eighteenth-century repertory. Period print reference: James Aird, *A Selection of Scotch, English, Irish and Foreign Airs*, vol. I, Glasgow, 1782, "Yankee Doodle." No lyrics are used. |
+| The British Grenadiers / `british-grenadiers` | Traditional march in eighteenth-century repertory, with earlier melodic antecedents. Historical tune reference: William Chappell, *Popular Music of the Olden Time*, vol. II, London, 1859, "The British Grenadiers." This later public-domain reference does not date the tune's composition to 1859. No lyrics are used. |
+| Minuet in G major / `minuet-in-g` | Christian Petzold, BWV Anh. 114, preserved in the 1725 *Notebook for Anna Magdalena Bach*. The game adapts the opening strain. Credit goes to Petzold, rather than attributing the composition to J. S. Bach. |
+| Ah! vous dirai-je, maman / `french-air` | Traditional eighteenth-century French air, arranged here as a slow air in the Green scene. Public-domain score reference: W. A. Mozart, *Twelve Variations on "Ah, vous dirai-je, maman"*, K. 265/300e, theme, first edition, Torricella, Vienna, 1785. Artaria's edition followed in 1787. Edition history: [G. Henle Verlag, "Mozart Klaviervariationen KV 265"](https://www.henle.de/blog/de/2017/07/17/mozart-klaviervariationen-kv265/). Mozart composed the variations; the underlying tune is traditional. No lyrics are used. |
+
+The playlist does not assign any tune to a historical side. The French air is eligible only during Green travel and shelter; the other three tunes rotate in all musical scenes. Each scene changes tempo, register, accompaniment density, and instrument choice. The night ride uses a new natural-minor adaptation, not an archival version of the melodies. Tune choice supplies no claim about the first shot.
 
 ### WL-S3 displayed script register
 

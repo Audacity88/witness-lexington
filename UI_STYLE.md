@@ -187,3 +187,16 @@ Three sizes are the contract: 662x418 (the embed widget), 960x540, and 1280x720.
 - Body text is at least 14px.
 
 Short screens (450px tall or less) tighten padding and step type down, without going below 14px.
+
+
+## Music toggle and soundtrack
+
+The existing music button stays in the HUD during travel and in the fixed action footer during overlays and dialogs. It uses the existing button styles, keyboard focus, and 44px minimum target. Dialog footers stay on one row. In dialog footers only, the toggle is a 44x44px music-note icon with a diagonal strike while muted. Its text and accessible label still change between Mute music and Play music. HUD and overlay footers retain the visible text. The compact dialog control leaves room for primary actions at desktop and embed sizes.
+
+- **Mute music** silences the soundtrack and changes the label to **Play music**. `aria-pressed="true"` means muted. **Play music** restores sound and the original label. The two labels have the same character count to limit footer growth at 662x418.
+- Music starts only after Begin or Resume. Muting is a session preference, separate from saved game progress. Pause, hidden tabs, and page exits suspend the audio clock. Resume restores music unless muted; clicking Play music while paused keeps audio suspended until Resume. An unavailable audio device disables the button and supplies an explanatory tooltip.
+- Four public-domain tune excerpts rotate through scene-specific shuffled playlists, with no immediate repeats, including across playlist refills and scene changes. The French air plays only during Green travel and shelter; the other three tunes are eligible in every musical scene. Each completed tune is followed by 20–40 seconds of silence. A scene change fades the old voices, rebuilds the eligible playlist, and preserves a current rest or adds a full rest after an interrupted tune.
+- Night adapts the melodies to natural minor at 66 or 76 beats per minute, an octave below study, with sparse fiddle or harpsichord and quiet open fifths. This is a new mood arrangement, not a period transcription. Muster uses fife or fiddle over bass drum and snare pulses. The Green uses slower, quiet fiddle or fife without drums. Study uses quiet harpsichord or fiddle with major-key keyboard accompaniment at 78 or 88 beats per minute. Successive tunes vary their lead instrument and tempo.
+- The opening, blackout, and first-shot observation sequence remain silent. This decorative soundtrack supplies no testimony, directional shot cue, or historical faction signal. Tune references are in `CREDITS.md`.
+
+Reviewer/Tester acceptance includes both mute states in travel, notebook, pause, evidence, and essay footers at 1280x720 and 662x418. Run `node test/ui-shots.mjs <loopback url> <outdir> 1280x720,662x418` once with `WL_UI_COLOR_SCHEME=light` and once with `WL_UI_COLOR_SCHEME=dark`, using separate output directories. The harness captures both labels and checks their accessible names, audio-context suspension on Pause, frozen paused time, and muted/unmuted Resume. Listening must still check timbre, balance, scene changes, and rests. Browser checks and screenshots are reviewer-owned after handoff under `WORK_INSTRUCTIONS.md`; the implementer does not run them.

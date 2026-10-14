@@ -169,11 +169,15 @@
 .wl dialog > button + p:empty { display:none; }
 .wl dialog > button + p { font-size:17px; margin:2px 0 12px; padding-left:14px; border-left:3px solid var(--wax); }
 .wl dialog .close {
-  position:sticky; bottom:-18px; z-index:1; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px 12px;
+  position:sticky; bottom:-18px; z-index:1; display:flex; flex-wrap:nowrap; justify-content:flex-end; gap:10px 12px;
   margin:12px -22px -18px; padding:12px 22px 14px; background:var(--paper-lo); border-top:3px double var(--ink);
 }
-.wl dialog .close button { flex:0 1 auto; }
-.wl dialog .close button.primary { flex:1 1 auto; }
+.wl dialog .close button { flex:none; }
+.wl dialog .close button.primary { flex:1 1 auto; min-width:44px; }
+.wl dialog .close #music { flex:none; width:44px; height:44px; padding:0; }
+.wl dialog .close #music span { position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.wl dialog .close #music::before { content:"\266b"; font:24px/1 Georgia,serif; }
+.wl dialog .close #music[aria-pressed="true"]::after { content:""; position:absolute; width:26px; left:6px; top:18px; border-top:2px solid currentColor; transform:rotate(-45deg); }
 .wl dialog article {
   margin:10px 6px 12px 0; padding:8px 12px 2px; background:var(--paper-hi); border:2px solid var(--ink); box-shadow:3px 3px 0 var(--ink);
 }
@@ -290,7 +294,8 @@
   .wl dialog > p { font-size:14px; }
   .wl dialog.talk header + .tag + p { font-size:16px; }
   .wl dialog > button + p { font-size:15px; }
-  .wl dialog .close { margin:8px -18px -18px; padding:8px 18px 10px; }
+  .wl dialog .close { margin:8px -18px -18px; padding:8px 18px 10px; gap:8px; }
+  .wl dialog .close button { padding-left:8px; padding-right:8px; }
   .wl dialog.notebook { padding-left:52px; }
   .wl dialog.notebook .close { margin-left:-52px; }
   .wl .study .card-scroll > h1 { font-size:21px; }
