@@ -91,3 +91,60 @@ node test/ui-shots.mjs http://127.0.0.1:8765/dist/witness-game.html /tmp/wl-musi
 The harness is at `test/ui-shots.mjs`, not `tools/ui-shots.mjs`. Both runs must exit 0 before browser acceptance is recorded. Inspect Revere's footer and the full 44px source-question target in both label states. Listening must still establish recognizable tunes, acceptable timbres and balance, clean arrangement transitions, the darker night mood, rests, and actual audible pause/resume behavior. Independent score/source verification remains pending because network stayed off. The clock-double checks and browser AudioContext state checks do not establish sound quality or historical source fidelity.
 
 No commit, push, branch switch, merge, install, deploy, or service mutation occurred. Changes are limited to WL-MUSIC2 and its generated artifacts.
+
+## Round 4: dialog footer repair and reviewer-owned browser acceptance
+
+kind: design
+card: WL-MUSIC2
+branch: wl-music2
+base and current HEAD: 4d2278325eae2ed2af501d25011a78daed7c5156
+checkout: /Users/dan/witness-lexington-codex-wt/wl-music2
+state: uncommitted; ready for review and wrapper commit
+
+This section supersedes Round 3's full-text dialog toggle design. Dan and chief/reviewer notes #180 and #182 restore reviewer-owned browser acceptance for this card and drop the in-sandbox browser requirement. Code and non-browser validation are complete; pending browser checks do not block this handoff. Astra code review and content review of this new diff are pending. No new review approval is claimed.
+
+- `src/night-ride.css` makes only the dialog-footer music toggle a fixed 44x44px music-note icon, with a diagonal strike while muted. Primary actions now have the space previously occupied by the full toggle text. Existing one-row footer rules, short-screen padding, and hit-target minimums remain. Actual browser layout is not verified.
+- `src/night-ride.js` retains the changing Mute music / Play music text in a span and adds the matching explicit accessible label. The span is visually hidden only inside dialog footers; travel HUD and overlay footers retain visible text. Existing aria-pressed, keyboard behavior, pause/mute separation, and playback logic remain.
+- `UI_STYLE.md` documents the icon and reviewer light/dark audit commands. `DESIGN_QUESTIONS.md` revises DQ-52. `WORK_INSTRUCTIONS.md` records Dan's clarification that browser checks and screenshots run in review/Tester after handoff, not in the implementer's sandbox.
+- Existing DOM checks in `test/green-essay-logic.cjs` now verify accessible labels during Pause/Resume and notebook mute/unmute. `test/ui-shots.mjs` adds accessible-name checks and explicit `WL_UI_COLOR_SCHEME=light|dark` emulation and reporting. No existing layout checks or thresholds were weakened.
+- `src/music.js`, historical dialogue, credits, tune data, scoring, and essay rules are unchanged. The Torricella credit, Green-only French air, darker minor night arrangements, Pause silence, no immediate repeats, and 20–40-second rests are retained. The six generated build outputs were rebuilt.
+
+Validation host: Dan's Mac. Working directory: the checkout above.
+
+```text
+$ node tools/build.mjs
+gzFenceJsonBytes: 596214
+exit 0
+$ npm test
+Web Audio clock double: 58 checks
+DOM/renderer simulation: 112 checks
+CPU scene construction: 136 checks
+Decoded dist payloads: 13 checks
+All 319 checks passed; exit 0
+$ node --check test/ui-shots.mjs
+exit 0
+$ git diff --check
+exit 0
+```
+
+Browser acceptance could not run in this sandbox. The direct harness command failed before browser launch:
+
+```text
+$ node test/ui-shots.mjs http://127.0.0.1:8765/index.html /private/tmp/wl-music2-round4-source-light 1280x720,662x418
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'puppeteer-core'
+exit 1
+```
+
+The error log is `/Users/dan/witness-lexington-codex-cache/wl-music2-round4-browser.log`. No dependencies were installed. An existing Playwright runtime was found in ChatGPT.app. A temporary, task-local adapter was prepared at `/private/tmp/wl-music2-browser-adapter.mjs`, with loader and resolver siblings, to run the existing audit against real Chrome without changing its assertions. That route was not executed because the task-owned test server could not bind:
+
+```text
+$ python3 -m http.server 8765 --bind 127.0.0.1
+PermissionError: [Errno 1] Operation not permitted
+exit 1
+```
+
+No server or browser started, and no existing services were changed. These earlier failed attempts are historical evidence, not a current handoff blocker. Per Dan and chief/reviewer notes #180 and #182, source and standalone acceptance at both sizes in light and dark are left to review/Tester after handoff. No further implementer browser checks were attempted. There are no new screenshots, no browser-console results, and no exit-0 browser claim. Listening and independent tune-source verification also remain unverified. Sources and arrangement transitions are documented in the existing credits and Round 3 notes; the passing audio-clock tests are not listening evidence.
+
+After handoff, review/Tester owns serving this exact checkout and running `test/ui-shots.mjs` against both `/index.html` and `/dist/witness-game.html`, each with `1280x720,662x418` and both color schemes. Use separate output directories and the reviewer-side browser environment. All four runs must exit 0 for browser acceptance. Inspect Revere Accept, record-listening, deliver-message, Who told you?, both mute states, and Pause/Resume. Implementer readiness does not claim browser acceptance.
+
+STATUS: ready

@@ -4,6 +4,8 @@ import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
 import path from 'node:path';
 const [,, url, outdir = '/tmp/wl-ui-shots', sizeList = '1280x720,960x540,662x418'] = process.argv;
+const colorScheme = process.env.WL_UI_COLOR_SCHEME || 'light';
+if (!['light', 'dark'].includes(colorScheme)) throw new Error('WL_UI_COLOR_SCHEME must be light or dark.');
 if (!url || !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname)) throw new Error('Supply a loopback test URL.');
 const executablePath = process.env.CHROME_BIN || ['/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(p => fs.existsSync(p));
 fs.mkdirSync(outdir, { recursive: true });
@@ -113,6 +115,7 @@ try {
     await page.setRequestInterception(true);
     page.on('request', r => { if (!r.url().startsWith(new URL(url).origin) && !/^(data|blob):/.test(r.url())) { external.push(r.url()); r.abort(); } else r.continue(); });
     await page.setViewport({ width, height });
+    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: colorScheme }]);
     const snap = () => page.evaluate(() => WitnessGame.snapshot());
     const click = async sel => { await page.waitForSelector(sel, { visible: true, timeout: 45000 }); await page.click(sel); };
     const phase = p => page.waitForFunction(p => WitnessGame.snapshot().run.phase === p, { timeout: 45000 }, p);
@@ -125,10 +128,10 @@ try {
         if (index) await click('#music');
         const state = await page.evaluate(() => {
           const button = document.getElementById('music'), game = WitnessGame.snapshot();
-          return { label: button.textContent, muted: button.getAttribute('aria-pressed'), disabled: button.disabled,
+          return { label: button.textContent, accessibleLabel: button.getAttribute('aria-label'), muted: button.getAttribute('aria-pressed'), disabled: button.disabled,
             paused: game.paused, phase: game.run.phase, footer: button.parentElement.className };
         });
-        if (state.disabled || state.label !== (muted ? 'Play music' : 'Mute music') || state.muted !== String(muted)) throw Error('Music toggle failed in ' + name);
+        if (state.disabled || state.label !== (muted ? 'Play music' : 'Mute music') || state.accessibleLabel !== state.label || state.muted !== String(muted)) throw Error('Music toggle failed in ' + name);
         const silent = muted || state.paused || ['intro', 'opening', 'blackout', 'green-event'].includes(state.phase);
         await audioState(silent ? 'suspended' : 'running');
         music.push({ name, ...state, audio: await page.evaluate(() => window.__wlAudio.state) });
@@ -185,7 +188,7 @@ try {
       if (await page.$('#finish-investigation')) { await click('#finish-investigation'); await phase('finished'); await shot('25-finished'); }
     } catch (e) { failure = e.message; await page.screenshot({ path: path.join(outdir, `${size}-failure.png`) }); }
     const problems = Object.fromEntries(Object.entries(audits).map(([k, a]) => [k, Object.fromEntries(Object.entries(a).filter(([, v]) => v.length))]).filter(([, a]) => Object.keys(a).length));
-    reports.push({ size, failure, errors, external, problems, music, shots: Object.keys(audits).length });
+    reports.push({ size, colorScheme, failure, errors, external, problems, music, shots: Object.keys(audits).length });
     await page.close();
   }
 } finally { await browser.close(); }

@@ -93,13 +93,17 @@
   var notebookButton = button('Notebook', notebook, 'notebook');
   var pauseButton = button('Pause', function () { setPaused(!paused); }, 'pause');
   var musicButton = button('Mute music', function () { music.toggle(); }, 'music');
+  var musicLabel = el('span', '', 'Mute music');
+  musicButton.replaceChildren(musicLabel);
   var music = window.WL_MUSIC(function (s) {
     musicButton.setAttribute('aria-pressed', String(s.muted));
-    musicButton.textContent = s.muted ? 'Play music' : 'Mute music';
+    musicLabel.textContent = s.muted ? 'Play music' : 'Mute music';
+    musicButton.setAttribute('aria-label', musicLabel.textContent);
     musicButton.disabled = s.unavailable;
     musicButton.title = s.unavailable ? 'Music is unavailable in this browser.' : s.started ? 'Synthesized background music' : 'Music starts when you begin or resume a run.';
   });
   musicButton.setAttribute('aria-pressed', 'false');
+  musicButton.setAttribute('aria-label', 'Mute music');
   musicButton.title = 'Music starts when you begin or resume a run.';
   tools.append(notebookButton, pauseButton, musicButton); top.append(brand, tools); host.appendChild(top);
   var panel = el('section', 'panel'), objective = el('p'), route = el('div', 'row route'), actionRow = el('div', 'row');

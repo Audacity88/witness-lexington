@@ -43,12 +43,14 @@ check('Game Pause forwards audio pause without changing the music label',()=>{
  const game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');game.click('pause');
  assert(game.snap().paused);assert(game.ctx.music.status().paused);assert(!game.ctx.music.status().muted);
  assert.equal(game.doc.getElementById('music').textContent,'Mute music');
+ assert.equal(game.doc.getElementById('music')['aria-label'],'Mute music');
  game.click('resume');assert(!game.ctx.music.status().paused);
 });
 check('Game Resume preserves a muted preference',()=>{
  const game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');game.click('pause');game.doc.getElementById('music').dispatch('click');game.click('resume');
  assert(!game.snap().paused);assert(!game.ctx.music.status().paused);assert(game.ctx.music.status().muted);
  assert.equal(game.doc.getElementById('music').textContent,'Play music');
+ assert.equal(game.doc.getElementById('music')['aria-label'],'Play music');
 });
 function alarm(g) { g.click('begin');g.click('skip');g.click('rewind');g.click('start-ride');g.click('interact');g.click('ask-source');g.click('accept');for(const id of ['lantern','orchard']){g.travel(id,id==='lantern'?28:10);g.click('record-alarm');}g.travel('parsonage',44); }
 function muster(g) {g.click('continue-dawn');g.click('start-muster');g.click('interact');g.click('accept-message');for(const id of ['near','far']){g.walkTo(id);g.click('record-listening');}g.walkTo('militia');g.click('deliver-message');g.click('ask-militia');g.click('close-dialog');g.walkTo('town');g.click('ask-town');g.click('close-dialog');g.walkTo('boundary');g.click('finish-muster');}
@@ -80,8 +82,8 @@ for(const spot of ['corner','edge']) {
  check('Music control survives document changes and notebook modal '+spot,()=>{
    g.click('next-document');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
    g.click('study-notebook');assert(g.host.querySelector('dialog').contains(g.doc.getElementById('music')));
-   g.doc.getElementById('music').dispatch('click');assert.equal(g.doc.getElementById('music').textContent,'Play music');assert.equal(g.doc.getElementById('music')['aria-pressed'],'true');
-   g.doc.getElementById('music').dispatch('click');assert.equal(g.doc.getElementById('music').textContent,'Mute music');assert.equal(g.doc.getElementById('music')['aria-pressed'],'false');
+   g.doc.getElementById('music').dispatch('click');assert.equal(g.doc.getElementById('music').textContent,'Play music');assert.equal(g.doc.getElementById('music')['aria-label'],'Play music');assert.equal(g.doc.getElementById('music')['aria-pressed'],'true');
+   g.doc.getElementById('music').dispatch('click');assert.equal(g.doc.getElementById('music').textContent,'Mute music');assert.equal(g.doc.getElementById('music')['aria-label'],'Mute music');assert.equal(g.doc.getElementById('music')['aria-pressed'],'false');
    g.click('close-dialog');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
  });
  for(const c of g.ctx.WG_DATA.cards){select(g,'document',c.id);if(c.id==='revere1775')assert(g.host.querySelector('.card').textContent.includes('Document paraphrase: Revere says'));g.click('inspect');assert(g.doc.getElementById('inspect').disabled);assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));}
