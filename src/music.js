@@ -35,7 +35,7 @@
       [77,1],[77,1],[76,1],[76,1],[74,1],[74,1],[72,2]] }
   ];
   var moods = {
-    night: { bpm: 88, level: 0.72, lead: ['fiddle', 'harpsichord'], bass: 'harpsichord', stride: 8, drums: 0, shift: -12 },
+    night: { bpm: 70, level: 0.72, lead: ['fiddle', 'harpsichord'], bass: 'harpsichord', stride: 8, drums: 0, shift: -24, minor: true },
     muster: { bpm: 112, level: 0.85, lead: ['fife', 'fiddle'], bass: 'harpsichord', stride: 4, drums: 1, shift: 0 },
     green: { bpm: 64, level: 0.65, lead: ['fiddle', 'fife'], bass: 'fiddle', stride: 8, drums: 0, shift: -12 },
     study: { bpm: 82, level: 0.6, lead: ['harpsichord', 'fiddle'], bass: 'harpsichord', stride: 4, drums: 0, shift: -12 }
@@ -50,11 +50,11 @@
   window.WL_MUSIC = function (changed) {
     var context = null, master, noise, timer, next = 0, note = 0, beat = 0;
     var pulse = 0;
-    var started = false, muted = false, unavailable = false, pageAway = false;
+    var started = false, muted = false, paused = false, unavailable = false, pageAway = false;
     var mood = null, tune = null, bag = [], lastTune = null, arrangement = 0, setting;
     var active = new Set();
-    function status() { return { started: started, muted: muted, unavailable: unavailable }; }
-    function silent() { return muted || document.hidden || pageAway || !mood; }
+    function status() { return { started: started, muted: muted, paused: paused, unavailable: unavailable }; }
+    function silent() { return muted || paused || document.hidden || pageAway || !mood; }
     function stopVoices() {
       active.forEach(function (v) {
         var gain = v.envelope.gain, time = context.currentTime;
@@ -98,7 +98,7 @@
     function rest() { return 20 + Math.random() * 20; }
     function beginTune() {
       if (!bag.length) {
-        bag = tunes.slice();
+        bag = tunes.filter(function (candidate) { return mood === 'green' || candidate.id !== 'french-air'; });
         for (var i = bag.length - 1; i > 0; i--) {
           var j = Math.floor(Math.random() * (i + 1)), swap = bag[i]; bag[i] = bag[j]; bag[j] = swap;
         }
@@ -117,13 +117,16 @@
           if (!tune) beginTune();
           var entry = tune.notes[note], m = setting.mood, tick = setting.tick;
           var length = entry[1] * tick;
-          voice(entry[0] + m.shift, next, length * (setting.lead === 'harpsichord' ? 0.62 : 0.88), setting.lead, 0.18 * m.level);
+          var degree = (entry[0] - tune.root + 12) % 12;
+          var pitch = entry[0] + m.shift - (m.minor && [4, 9, 11].includes(degree) ? 1 : 0);
+          voice(pitch, next, length * (setting.lead === 'harpsichord' ? 0.62 : 0.88), setting.lead, 0.18 * m.level);
           // Night uses a quiet open fifth rather than a busy major-key accompaniment.
           while (pulse < beat + entry[1]) {
             var at = next + (pulse - beat) * tick;
             if (pulse % m.stride === 0) {
-              voice(tune.root - 12, at, tick * 1.5, m.bass, 0.055 * m.level);
-              voice(tune.root - 5, at, tick * 1.5, m.bass, 0.025 * m.level);
+              var root = tune.root - (m.minor ? 12 : 0);
+              voice(root - 12, at, tick * 1.5, m.bass, 0.055 * m.level);
+              voice(root - 5, at, tick * 1.5, m.bass, 0.025 * m.level);
               if (mood === 'study') voice(tune.root + 4, at + tick * 0.5, tick, 'harpsichord', 0.025);
             }
             if (m.drums) voice(0, at, 0.12, pulse % 2 ? 'snare' : 'drum', 0.1 * m.level);
@@ -159,6 +162,7 @@
     return {
       start: function () { started = true; sync(); },
       toggle: function () { muted = !muted; sync(); },
+      pause: function (value) { if (paused === value) return; paused = value; sync(); },
       scene: function (phase) {
         var selected = moodFor(phase);
         if (selected === mood) return;
@@ -168,7 +172,7 @@
           // Preserve an existing playlist rest, and leave a full rest after an interrupted tune.
           next = Math.max(tune ? context.currentTime + 0.03 + rest() : next, context.currentTime + 0.05);
         }
-        tune = null; sync();
+        tune = null; bag = []; sync();
       },
       status: status
     };

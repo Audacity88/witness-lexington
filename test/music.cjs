@@ -68,15 +68,19 @@ function check(name, fn) { fn(); checks++; console.log('PASS ' + name); }
   const idle = boot(); idle.music.scene('ride'); idle.music.toggle();
   check('Scene and mute changes never create an AudioContext before Begin', () => assert.equal(idle.contexts.length, 0));
   for (const random of [0, 0.5, 0.999999]) {
-    const g = boot(random); g.music.scene('muster'); g.music.start(); await g.advance(1000);
+    for (const phase of ['ride', 'muster', 'green', 'study']) {
+    const g = boot(random); g.music.scene(phase); g.music.start(); await g.advance(1000);
     const a = g.contexts[0], songs = groups(melody(a));
     const signatures = songs.map(s => s.slice(0, 3).map(pitch).join(','));
-    check('Four tunes, no immediate repeats, across bag boundaries at random ' + random, () => {
-      assert(songs.length >= 10); assert.equal(new Set(signatures).size, 4);
+    const count = phase === 'green' ? 4 : 3;
+    check('Scene playlist and no immediate repeats in ' + phase + ' at random ' + random, () => {
+      assert(songs.length >= 8); assert.equal(new Set(signatures).size, count);
       for (let i = 1; i < signatures.length; i++) assert.notEqual(signatures[i], signatures[i - 1]);
-      assert.equal(new Set(signatures.slice(0, 4)).size, 4);
+      assert.equal(new Set(signatures.slice(0, count)).size, count);
+      assert.equal(signatures.includes('60,60,67'), phase === 'green');
+      if (phase === 'ride') assert(!signatures.includes('48,48,55'));
     });
-    check('Every completed tune has a 20–40 second rest at random ' + random, () => {
+    check('Every completed tune has a 20–40 second rest in ' + phase + ' at random ' + random, () => {
       for (let i = 1; i < songs.length; i++) {
         const last = songs[i - 1].at(-1), attack = last.target.target.gain.events.find(e => e[0] === 'linear')[2] - last.startTime;
         const nominalEnd = last.startTime + (last.stopTime - 0.01 - last.startTime) / (attack < 0.01 ? 0.62 : 0.88);
@@ -84,24 +88,36 @@ function check(name, fn) { fn(); checks++; console.log('PASS ' + name); }
         assert(silence >= 20 - 1e-6 && silence <= 40 + 1e-6, String(silence));
       }
     });
-    check('Muster uses fife, fiddle, bass drum and snare; ended nodes disconnect', () => {
+    if (phase === 'muster') check('Muster uses fife, fiddle, bass drum and snare; ended nodes disconnect', () => {
       assert(a.sources.some(s => s.noise)); assert(a.sources.some(s => s.type === 'triangle' && peak(s) > 0.1));
       assert(a.sources.some(s => s.type === 'sawtooth' && peak(s) > 0.1));
       assert(a.sources.filter(s => s.ended).every(s => s.disconnected && s.target.disconnected && s.target.target.disconnected));
     });
+    }
   }
   for (const phase of ['ride', 'muster', 'green', 'study']) {
     const g = boot(); g.music.scene(phase); g.music.start(); await g.advance(100);
     const a = g.contexts[0], notes = melody(a), first = notes[0];
     check('Scene arrangement ' + phase, () => {
       assert(notes.length); assert.equal(a.sources.some(s => s.noise), phase === 'muster');
-      const expected = phase === 'muster' ? 72 : 60; assert.equal(pitch(first), expected);
+      const expected = phase === 'muster' ? 72 : phase === 'ride' ? 48 : 60; assert.equal(pitch(first), expected);
       const tick = notes[1].startTime - first.startTime;
-      assert(Math.abs(tick - 60 / ({ride:84,muster:108,green:60,study:78}[phase])) < 1e-6);
+      assert(Math.abs(tick - 60 / ({ride:66,muster:108,green:60,study:78}[phase])) < 1e-6);
       const attack = first.target.target.gain.events.find(e => e[0] === 'linear')[2] - first.startTime;
       assert(Math.abs(attack - (phase === 'muster' ? 0.018 : phase === 'study' ? 0.004 : 0.045)) < 1e-6);
     });
   }
+  const night = boot(), study = boot();
+  night.music.scene('ride'); night.music.start(); study.music.scene('study'); study.music.start();
+  await night.advance(16); await study.advance(16);
+  check('Night lowers major thirds and register, slows the lead, and keeps open fifths', () => {
+    const nightLead = melody(night.contexts[0]), studyLead = melody(study.contexts[0]);
+    assert.deepEqual(nightLead.slice(0, 4).map(pitch), [48, 48, 50, 51]);
+    assert.deepEqual(studyLead.slice(0, 4).map(pitch), [60, 60, 62, 64]);
+    assert(nightLead[1].startTime - nightLead[0].startTime > studyLead[1].startTime - studyLead[0].startTime);
+    const bass = night.contexts[0].sources.filter(s => !s.noise && peak(s) < 0.1);
+    assert.deepEqual([...new Set(bass.map(pitch))], [36, 43]);
+  });
   const g = boot(); g.music.scene('ride'); g.music.start(); await g.advance(3);
   const a = g.contexts[0], count = a.sources.length, frozen = a.currentTime;
   g.music.toggle(); await g.advance(50);
@@ -110,6 +126,31 @@ function check(name, fn) { fn(); checks++; console.log('PASS ' + name); }
   });
   g.music.toggle(); await g.advance(3);
   check('Unmute resumes without creating another context', () => { assert.equal(g.contexts.length, 1); assert(a.sources.length > count); });
+  g.music.pause(true); const pausedTime = a.currentTime, pausedCount = a.sources.length;
+  await g.advance(50);
+  check('Pause suspends sound and freezes the playlist clock without changing mute', () => {
+    assert(g.music.status().paused); assert(!g.music.status().muted); assert.equal(a.state, 'suspended');
+    assert.equal(a.currentTime, pausedTime); assert.equal(a.sources.length, pausedCount);
+    assert.equal(a.sources[0].target.target.target.gain.value, 0);
+  });
+  g.music.toggle(); g.music.toggle(); await g.advance(50);
+  check('Unmuting while paused cannot restart audio', () => {
+    assert.equal(a.state, 'suspended'); assert.equal(a.currentTime, pausedTime); assert.equal(a.sources.length, pausedCount);
+  });
+  g.music.pause(false); await g.advance(3);
+  check('Resume restores an unmuted soundtrack on the same context', () => {
+    assert(!g.music.status().paused); assert.equal(a.state, 'running'); assert(a.currentTime > pausedTime);
+    assert.equal(g.contexts.length, 1);
+  });
+  g.music.toggle(); g.music.pause(true); g.music.pause(false); await g.advance(50);
+  check('Resume retains mute and cannot bypass hidden-tab or page-exit silence', () => {
+    assert(g.music.status().muted); assert.equal(a.state, 'suspended');
+    g.music.toggle(); g.doc.hidden = true; g.doc.events.visibilitychange(); g.music.pause(true); g.music.pause(false);
+    assert.equal(a.state, 'suspended');
+    g.doc.hidden = false; g.doc.events.visibilitychange(); g.events.pagehide(); g.music.pause(true); g.music.pause(false);
+    assert.equal(a.state, 'suspended');
+    g.events.pageshow();
+  });
   g.doc.hidden = true; g.doc.events.visibilitychange(); const hiddenCount = a.sources.length; await g.advance(50);
   check('Hidden tabs schedule no notes', () => assert.equal(a.sources.length, hiddenCount));
   g.doc.hidden = false; g.doc.events.visibilitychange(); await g.advance(1);
@@ -130,8 +171,20 @@ function check(name, fn) { fn(); checks++; console.log('PASS ' + name); }
     const notes = melody(a).filter(s => s.startTime > transition + 0.2);
     assert(notes.length); assert(notes[0].startTime - transition >= 30);
     assert.equal(notes[0].type, 'sawtooth');
-    assert.notEqual(notes.slice(0,3).map(pitch).join(','), groups(melody(a))[0].slice(0,3).map(s => pitch(s) + 12).join(','));
+    assert.notEqual(notes.slice(0,3).map(pitch).join(','), groups(melody(a))[0].slice(0,3).map(s => pitch(s) + 24).join(','));
   });
+  const change = boot(0); change.music.scene('green'); change.music.start(); await change.advance(300);
+  const changeAudio = change.contexts[0];
+  for (const phase of ['study', 'ride', 'muster', 'shelter', 'study']) {
+    const transition = changeAudio.currentTime; change.music.scene(phase); await change.advance(300);
+    const signatures = groups(melody(changeAudio).filter(s => s.startTime > transition + 0.2)).map(song => song.slice(0, 3).map(pitch).join(','));
+    check('Scene change rebuilds the eligible playlist for ' + phase, () => {
+      assert(signatures.length >= 2);
+      assert.equal(signatures.includes('60,60,67'), phase === 'shelter');
+      assert(!signatures.includes('48,48,55'));
+      for (let index = 1; index < signatures.length; index++) assert.notEqual(signatures[index], signatures[index - 1]);
+    });
+  }
   const legacy = boot(); legacy.music.scene('ride'); legacy.music.start(); await legacy.advance(3);
   const live = legacy.contexts[0].sources.filter(s => !s.ended && s.startTime < legacy.contexts[0].currentTime);
   for (const s of live) { s.target.target.gain.cancelAndHoldAtTime = undefined; s.target.target.gain.value = 0.037; }

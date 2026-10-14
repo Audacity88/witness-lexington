@@ -75,7 +75,7 @@ These references identify the underlying public-domain music. The game uses orig
 | Minuet in G major / `minuet-in-g` | Christian Petzold, BWV Anh. 114, preserved in the 1725 *Notebook for Anna Magdalena Bach*. The game adapts the opening strain. Credit goes to Petzold, rather than attributing the composition to J. S. Bach. |
 | Ah! vous dirai-je, maman / `french-air` | Traditional eighteenth-century French air, arranged here as a slow air in the Green scene. Public-domain score reference: W. A. Mozart, *Twelve Variations on "Ah, vous dirai-je, maman"*, K. 265/300e, theme, first edition, Torricella, Vienna, 1785. Artaria's edition followed in 1787. Edition history: [G. Henle Verlag, "Mozart Klaviervariationen KV 265"](https://www.henle.de/blog/de/2017/07/17/mozart-klaviervariationen-kv265/). Mozart composed the variations; the underlying tune is traditional. No lyrics are used. |
 
-The playlist does not assign any tune to a historical side. Each scene changes tempo, register, accompaniment density, and instrument choice. Tune choice supplies no claim about the first shot.
+The playlist does not assign any tune to a historical side. The French air is eligible only during Green travel and shelter; the other three tunes rotate in all musical scenes. Each scene changes tempo, register, accompaniment density, and instrument choice. The night ride uses a new natural-minor adaptation, not an archival version of the melodies. Tune choice supplies no claim about the first shot.
 
 ### WL-S3 displayed script register
 

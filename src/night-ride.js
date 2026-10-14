@@ -191,7 +191,7 @@
     var footer = dialog.open ? dialog.querySelector('.close') : !overlay.hidden ? card.querySelector('.card-actions') : tools;
     if (footer) footer.appendChild(musicButton);
   }
-  function render() { music.scene(state.phase); tools.appendChild(musicButton); draw(); splitCard(); placeMusic(); }
+  function render() { music.pause(paused); music.scene(state.phase); tools.appendChild(musicButton); draw(); splitCard(); placeMusic(); }
   function draw() {
     panel.classList.toggle('is-caption', state.phase === 'opening');
     chapter.textContent = ['intro', 'opening', 'blackout'].includes(state.phase) ? 'Dawn of April 19 · reconstructed opening' : later() ? modern() ? 'Modern study · evidence and answer' : 'Lexington Green · reconstructed scene' : ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
