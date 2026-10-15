@@ -3,6 +3,7 @@
 import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
 import path from 'node:path';
+import { verifyReports } from './verify.mjs';
 const [,, url, outdir = '/tmp/wl-ui-shots', sizeList = '1280x720,960x540,662x418'] = process.argv;
 const colorScheme = process.env.WL_UI_COLOR_SCHEME || 'light';
 if (!['light', 'dark'].includes(colorScheme)) throw new Error('WL_UI_COLOR_SCHEME must be light or dark.');
@@ -188,10 +189,10 @@ try {
       if (await page.$('#finish-investigation')) { await click('#finish-investigation'); await phase('finished'); await shot('25-finished'); }
     } catch (e) { failure = e.message; await page.screenshot({ path: path.join(outdir, `${size}-failure.png`) }); }
     const problems = Object.fromEntries(Object.entries(audits).map(([k, a]) => [k, Object.fromEntries(Object.entries(a).filter(([, v]) => v.length))]).filter(([, a]) => Object.keys(a).length));
-    reports.push({ size, colorScheme, failure, errors, external, problems, music, shots: Object.keys(audits).length });
+    reports.push({ size, colorScheme, failure, errors, external, problems, music, checks: Object.keys(audits), shots: Object.keys(audits).length });
     await page.close();
   }
 } finally { await browser.close(); }
 fs.writeFileSync(path.join(outdir, 'ui-audit.json'), JSON.stringify(reports, null, 2));
 console.log(JSON.stringify(reports, null, 2));
-if (reports.some(r => r.failure || r.errors.length || r.external.length || Object.keys(r.problems).length)) process.exitCode = 1;
+verifyReports(reports);

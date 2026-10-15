@@ -1,5 +1,6 @@
 #!/bin/bash
 # Full matrix. Needs: (cd /workspace/witness-game && python3 -m http.server 8765 --bind 127.0.0.1) running; node tools/build.mjs done.
+set -e
 cd "$(dirname "$0")/.." || exit 1
 U=http://127.0.0.1:8765
 for sz in "960 540" "662 418"; do for sc in light dark; do
