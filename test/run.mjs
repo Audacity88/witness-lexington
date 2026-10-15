@@ -1,12 +1,15 @@
 // Headless test driver: node run.mjs <url> <w> <h> <light|dark> <outdir> <steps.json>
 import puppeteer from 'puppeteer-core';
 import fs from 'fs';
+import { verifyReports } from './verify.mjs';
 const [,, url, w, h, scheme, outdir, stepsFile] = process.argv;
 const steps = JSON.parse(fs.readFileSync(stepsFile, 'utf8'));
+if (!Array.isArray(steps) || !steps.some(step => step.expect)) throw new Error('Playtest requires at least one explicit expectation.');
 fs.mkdirSync(outdir, { recursive: true });
-const errors = [], net = [], results = [];
+const errors = [], net = [], results = [], checks = [];
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new',
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync'] });
+try {
 const page = await browser.newPage();
 await page.setViewport({ width: +w, height: +h });
 await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
@@ -29,11 +32,12 @@ for (const s of steps) {
   if (s.scroll) await page.evaluate(s.scroll);
   if (s.shot) await page.screenshot({ path: `${outdir}/${s.shot}.png` });
   if (s.eval) { try { st = await page.evaluate(s.eval); } catch (e) { errors.push('eval ' + s.name + ': ' + e.message); } }
-  if (s.expect) { let ok = false; try { ok = await page.evaluate(s.expect); } catch (e) {} if (!ok) errors.push('EXPECT FAILED ' + s.name + ': ' + s.expect); }
+  if (s.expect) { let ok = false; try { ok = await page.evaluate(s.expect); } catch (e) {} checks.push(s.name); if (!ok) errors.push('EXPECT FAILED ' + s.name + ': ' + s.expect); }
   results.push({ name: s.name, state: st });
 }
-fs.writeFileSync(`${outdir}/results-${w}x${h}-${scheme}.json`, JSON.stringify({ url, w, h, scheme, errors, net, results }, null, 1));
-console.log(JSON.stringify({ size: `${w}x${h}`, scheme, errors: errors.length, net: net.length, steps: results.length }));
+fs.writeFileSync(`${outdir}/results-${w}x${h}-${scheme}.json`, JSON.stringify({ url, w, h, scheme, errors, net, results, checks }, null, 1));
+console.log(JSON.stringify({ size: `${w}x${h}`, scheme, errors: errors.length, net: net.length, steps: results.length, checks: checks.length }));
 if (errors.length) console.log(errors.slice(0, 20).join('\n'));
 if (net.length) console.log('NET:', net.join(' '));
-await browser.close();
+} finally { await browser.close(); }
+verifyReports([{ checks, errors, external: net }]);

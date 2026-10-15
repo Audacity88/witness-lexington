@@ -4,6 +4,7 @@ import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { verifyReports } from './verify.mjs';
 const [,, url, outdir = '/tmp/wl-s2-shots'] = process.argv;
 if (!url || !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname)) throw new Error('Supply a loopback test URL.');
 const executablePath = process.env.CHROME_BIN || [
@@ -133,4 +134,4 @@ try {
   }
 } finally { await browser.close(); }
 console.log(JSON.stringify(reports.map(({ width, height, checks, failure, errors }) => ({ width, height, checks: checks.length, failure, errors })), null, 2));
-if (reports.some(r => r.failure || r.errors.length || r.external.length)) process.exitCode = 1;
+verifyReports(reports);
