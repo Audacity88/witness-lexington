@@ -68,19 +68,30 @@ try {
       await page.keyboard.down(modifier); await page.keyboard.press('A'); await page.keyboard.up(modifier); await page.keyboard.press('Backspace');
       await page.keyboard.type(text, {delay:60});
     }
+    async function hypothesisSteps() {
+      for (const field of ['account', 'shooter', 'location']) {
+        check('Separate hypothesis step ' + field, await page.$('#' + field) !== null && await page.$$eval('.card select', fields => fields.length === 1));
+        await shot('hypothesis-' + field); await click('#hypothesis-next');
+      }
+    }
+    async function editLimitation(text) {
+      await click('#rank-sources'); await click('#rank-next'); await typeAnswer(text, '#limitation');
+      await click('#limitation-back'); await click('#rank-documents');
+    }
     let failure = null;
     try {
       await page.goto(url, { waitUntil: 'load' });
       await page.evaluate(() => localStorage.removeItem('witness-lexington-s1-v1'));
       await page.reload({ waitUntil: 'load' });
       await click('#begin'); await click('#skip'); await click('#rewind'); await click('#start-ride');
-      await click('#interact'); await click('#ask-source'); await click('#accept');
+      await click('#interact'); await click('#ask-source'); await click('#hear-errand'); await click('#accept');
       for (const id of ['lantern', 'orchard']) { await travel(id, id === 'lantern' ? 28 : 10); await click('#record-alarm'); }
       await travel('parsonage', 44); await click('#continue-dawn'); await click('#start-muster');
       check('Talk with Parker visible',await visibleAction('#interact'));await shot('muster-start');
       await click('#interact'); await click('#accept-message');
+      await walkTo('militia'); await click('#deliver-message');
       for (const id of order) { await walkTo(id); await click('#record-listening'); }
-      await walkTo('militia'); await click('#deliver-message'); await click('#ask-militia'); await click('#close-dialog');
+      await walkTo('militia'); await click('#ask-militia'); await click('#close-dialog');
       await walkTo('town'); await click('#ask-town'); await click('#close-dialog');
       await walkTo('boundary'); await click('#finish-muster'); await phase('muster-complete');
       const migration = await page.evaluateOnNewDocument(() => {
@@ -113,12 +124,15 @@ try {
         check('Citation hit target '+id,await page.$eval('.card a',e=>e.getBoundingClientRect().height>=44));
         check('Study action pinned '+id,await visibleAction('#inspect'));await click('#inspect');
       }
-      await page.select('#rank-0','barker');await page.select('#rank-1','barker');check('Duplicate rank blocked',await page.$eval('#choose-belief',e=>e.disabled));
-      await page.select('#rank-1','revere1775');await click('#limitation');await page.keyboard.type('The diary gives one observer’s account and cannot establish every possible view.');
+      await click('#rank-sources');
+      await page.select('#rank-0','barker');await page.select('#rank-1','barker');check('Duplicate rank blocked',await page.$eval('#rank-next',e=>e.disabled));
+      await page.select('#rank-1','revere1775');await click('#rank-next');await click('#limitation');await page.keyboard.type('The diary gives one observer’s account and cannot establish every possible view.');
       await click('#choose-belief');await click('#belief-unsure');await phase('hypothesis');
+      await hypothesisSteps();
       check('Hypothesis action pinned',await visibleAction('#check-hypothesis'));await click('#check-hypothesis');check('Militia preset accepted',await page.$eval('#hypothesis-result',e=>e.textContent.includes('Fits the inherited')));
       check('Hypothesis result scrolled into view',await visibleResult('#hypothesis-result'));
-      await page.select('#account','british');await click('#check-hypothesis');check('British preset accepted',await page.$eval('#hypothesis-result',e=>e.textContent.includes('Fits the inherited')));
+      for(let step=0;step<3;step++)await click('#hypothesis-back');
+      await page.select('#account','british');await hypothesisSteps();await click('#check-hypothesis');check('British preset accepted',await page.$eval('#hypothesis-result',e=>e.textContent.includes('Fits the inherited')));
       check('Account tests preserve uncertain belief',(await snapshot()).run.green.belief==='unsure');
       for(const value of ['stopped','even']){await page.select('#aftermath',value);await click('#check-hypothesis');check('Fact rejection '+value,await page.$eval('#hypothesis-result',e=>e.textContent.includes('Contradicts the inherited')));check('No essay action after rejection '+value,await page.$('#write-essay')===null);check('Contradictions named '+value,await page.$eval('#hypothesis-result',e=>e.textContent.includes('[OUTCOME]')&&!e.textContent.includes('Current document:')));await shot('rejected-'+value);}
       await page.select('#aftermath','fewshots');await click('#check-hypothesis');await click('#write-essay');await phase('essay');
@@ -131,13 +145,13 @@ try {
         return events.every(e=>!ta.dispatchEvent(e))&&ta.value===before;
       });check('Paste/drop/beforeinput blocked',blocked);
       const draft=(await snapshot()).run.green.essay;await click('#essay-documents');
-      await typeAnswer('', '#limitation');check('Cleared limitation disables essay return',await page.$eval('#return-essay',e=>e.disabled));
+      await editLimitation('');check('Cleared limitation disables essay return',await page.$eval('#return-essay',e=>e.disabled));
       await reloadAndResume();await phase('study');check('Incomplete ranking resumes with draft and dawn intact',(await snapshot()).run.green.essay===draft&&(await snapshot()).run.dawn.boundary);
-      await typeAnswer('Too short', '#limitation');check('Short limitation keeps return disabled',await page.$eval('#return-essay',e=>e.disabled));
-      await typeAnswer('The diary gives only one observer’s view.', '#limitation');
-      await page.select('#rank-1','barker');check('Duplicate ranks disable essay return',await page.$eval('#return-essay',e=>e.disabled));
+      await editLimitation('Too short');check('Short limitation keeps return disabled',await page.$eval('#return-essay',e=>e.disabled));
+      await editLimitation('The diary gives only one observer’s view.');await click('#rank-sources');
+      await page.select('#rank-1','barker');await click('#rank-documents');check('Duplicate ranks disable essay return',await page.$eval('#return-essay',e=>e.disabled));
       await reloadAndResume();await phase('study');check('Invalid pair still resumes study with draft',(await snapshot()).run.green.essay===draft);
-      await page.select('#rank-0','barker');await page.select('#rank-1','revere1775');check('Repaired ranking enables return',await page.$eval('#return-essay',e=>!e.disabled));
+      await click('#rank-sources');await page.select('#rank-0','barker');await page.select('#rank-1','revere1775');await click('#rank-documents');check('Repaired ranking enables return',await page.$eval('#return-essay',e=>!e.disabled));
       await page.select('#document','revere1798');await click('#return-essay');check('Draft retained after document visit',await page.$eval('#essay-text',e=>e.value)===draft);
       await reloadAndResume();await phase('essay');check('Draft and telemetry survive refresh',(await snapshot()).run.green.essay===draft&&(await snapshot()).run.green.tel.dropAttempts===1);
       const answers=[
@@ -192,7 +206,7 @@ try {
         await click('#load');await phase('hypothesis');
         const recovered=(await snapshot()).run;
         check('Older '+checkpointPhase+' draft and progress retained',recovered.green.essay===kept.green.essay&&JSON.stringify(recovered.dawn)===JSON.stringify(kept.dawn)&&JSON.stringify(recovered.green.rank)===JSON.stringify(kept.green.rank));
-        await click('#check-hypothesis');check('Recovered contradiction still blocks Write',await page.$('#write-essay')===null);await shot('recovered-'+checkpointPhase);
+        await hypothesisSteps();await click('#check-hypothesis');check('Recovered contradiction still blocks Write',await page.$('#write-essay')===null);await shot('recovered-'+checkpointPhase);
         await page.select('#aftermath','fewshots');await click('#check-hypothesis');await click('#write-essay');await click('#check-essay');
         check('Recovered authored draft can finish',await page.$('#finish-investigation')!==null);
       }

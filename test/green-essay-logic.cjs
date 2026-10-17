@@ -62,6 +62,7 @@ function routes(game) {return game.host.querySelectorAll('button').filter(node=>
 function muster(g) {
  g.click('continue-dawn');g.click('start-muster');assert.deepEqual(routes(g),['parker']);g.click('interact');g.click('accept-message');
  assert.deepEqual(routes(g),['militia']);g.walkTo('militia');assert(!g.doc.getElementById('ask-militia'));g.click('deliver-message');
+ assert(g.host.querySelector('.panel').textContent.includes('Message delivered.'));
  assert.deepEqual(routes(g),['near','far']);g.click('interact');assert(!g.doc.getElementById('ask-militia'));assert(!g.doc.getElementById('deliver-message'));g.click('close-dialog');
  for(const id of ['near','far']){g.walkTo(id);g.click('record-listening');}
  assert.deepEqual(routes(g),['militia','town']);g.walkTo('militia');assert(!g.doc.getElementById('deliver-message'));g.click('ask-militia');g.click('close-dialog');
@@ -69,8 +70,9 @@ function muster(g) {
  assert.deepEqual(routes(g),['boundary']);g.walkTo('boundary');g.click('finish-muster');
 }
 function hypothesisSteps(game) {
- for(const field of ['account','shooter','location']){assert(game.doc.getElementById(field));assert.equal(game.host.querySelectorAll('select').length,1);assert(!game.doc.getElementById('check-hypothesis'));game.click('hypothesis-next');}
+ for(const field of ['account','shooter','location']){assert(game.doc.getElementById(field));assert.equal(game.host.querySelectorAll('select').length,1);assert(!game.doc.getElementById('check-hypothesis'));const review=game.host.querySelector('details');assert(!review.open);assert(review.contains(game.doc.getElementById('change-belief')));assert(review.contains(game.doc.getElementById('hypothesis-documents')));assert(!game.host.querySelector('.card-actions').contains(game.doc.getElementById('change-belief')));game.click('hypothesis-next');}
  assert(game.doc.getElementById('aftermath'));assert.equal(game.host.querySelectorAll('select').length,1);
+ assert(game.host.querySelector('details').contains(game.doc.getElementById('hypothesis-documents')));
 }
 function walkGreen(g,id) { g.click('travel-'+id);let n=0;while(g.snap().assisted&&n++<800)g.frame();assert(n<800);g.click('interact'); }
 function select(g,id,value){const n=g.doc.getElementById(id);assert(n,id);n.value=value;n.dispatch('change');}
@@ -140,7 +142,7 @@ for(const spot of ['corner','edge']) {
  for(let step=0;step<3;step++)g.click('hypothesis-back');select(g,'account','british');hypothesisSteps(g);g.click('check-hypothesis');check('British preset also accepted '+spot,()=>assert(g.host.querySelector('#hypothesis-result').textContent.includes('Fits the inherited')));
  for(const a of ['stopped','even']){select(g,'aftermath',a);g.click('check-hypothesis');check('Hard facts reject '+a+' '+spot,()=>{assert(g.host.querySelector('#hypothesis-result').textContent.includes('Contradicts the inherited'));assert(!g.doc.getElementById('write-essay'));assert(g.host.querySelector('#hypothesis-result').textContent.includes('[OUTCOME]'));assert(g.host.querySelector('#hypothesis-result').textContent.includes('Paul Revere'));});}
  select(g,'aftermath','fewshots');g.click('check-hypothesis');g.click('write-essay');
- check('Overlay Tab includes collapsed essay criteria and wraps form controls '+spot,()=>{const details=g.host.querySelector('details');assert(!details.open);assert(details.textContent.includes('three distinct claim sentences'));g.doc.activeElement=g.host;g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-criteria');g.key('Tab',{shiftKey:true});assert.equal(g.doc.activeElement.id,'essay-notebook');g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-criteria');g.doc.getElementById('essay-text').focus();});
+ check('Overlay Tab includes collapsed essay criteria and wraps form controls '+spot,()=>{const details=g.host.querySelector('details');assert(!details.open);assert(details.textContent.includes('three distinct claim sentences'));assert.deepEqual(g.host.querySelectorAll('textarea, summary').map(control=>control.id),['essay-text','essay-criteria']);g.doc.activeElement=g.host;g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-text');g.key('Tab',{shiftKey:true});assert.equal(g.doc.activeElement.id,'essay-notebook');g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-text');});
  type(g,'essay-text','I believe the regulars fired first.');g.click('check-essay');check('Short unsupported answer fails '+spot,()=>assert(!g.doc.getElementById('finish-investigation')));
  check('Paste, drop, beforeinput blocked '+spot,()=>{const n=g.doc.getElementById('essay-text');for(const kind of ['paste','drop']){let stopped=false;n.dispatch(kind,{preventDefault(){stopped=true;}});assert(stopped);}let stopped=false;n.dispatch('beforeinput',{inputType:'insertFromPaste',preventDefault(){stopped=true;}});assert(stopped);assert.equal(g.snap().run.green.tel.pasteAttempts,2);assert.equal(g.snap().run.green.tel.dropAttempts,1);});
  check('Page exit flushes focused time '+spot,()=>{const ta=g.doc.getElementById('essay-text');ta.focus();g.frames(20);g.events.pagehide.forEach(fn=>fn());assert(JSON.parse(g.storage[KEY]).run.green.tel.msFocused>=1000);});

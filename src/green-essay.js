@@ -127,6 +127,12 @@
         b(o[1], function () { g().belief = o[0]; draft = null; env.go('hypothesis'); }, 'belief-' + o[0], true);
       });
     }
+    function reviewChoices() {
+      var review = env.el('details', 'review-choices'), summary = env.el('summary', '', 'Review belief or documents'); summary.id = 'review-choices'; review.appendChild(summary);
+      review.appendChild(env.button('Change provisional belief', belief, 'change-belief'));
+      review.appendChild(env.button('Inspect documents', function () { env.go('study'); }, 'hypothesis-documents'));
+      body.appendChild(review);
+    }
     function hypothesis(step) {
       step = step || 'account';
       var s = g(), old = draft || s.hypothesis && s.hypothesis.version;
@@ -153,7 +159,7 @@
         b('Back to shooter', function () { nextStep('shooter'); }, 'hypothesis-back');
       }
       if (step !== 'aftermath') {
-        b('Change provisional belief', belief, 'change-belief'); b('Inspect documents', function () { env.go('study'); }, 'hypothesis-documents');
+        reviewChoices();
         return;
       }
       add('Possible shooter: ' + D.shooters[v.shooter].label + '. Location: ' + D.zones[v.location].label + '.');
@@ -177,7 +183,7 @@
         revealResult(result);
       }, 'check-hypothesis', true);
       b('Back to location', function () { nextStep('location'); }, 'hypothesis-back');
-      b('Change provisional belief', belief, 'change-belief'); b('Inspect documents', function () { env.go('study'); }, 'hypothesis-documents');
+      reviewChoices();
     }
     function finishFocus(continueFocus) { if (focusSince !== null) { g().tel.msFocused += performance.now() - focusSince; focusSince = continueFocus ? performance.now() : null; } }
     function essay() {
@@ -185,10 +191,11 @@
       add('Use at least ' + E.minRefs + ' evidence references. Weigh the opposing account. Write at least ' + E.minWords + ' words.');
       var criteria = env.el('details', 'essay-criteria'), summary = env.el('summary', '', 'Full writing criteria and review limits'); summary.id = 'essay-criteria'; criteria.appendChild(summary);
       env.paragraph(criteria, 'Write at least three distinct claim sentences of five or more words each, connect evidence to your conclusion, and keep each sentence focused on one or two sources or facts. Use source details in complete claims and avoid repeated sentences or keyword lists. Address the opposing account and weigh it. Inspected historical cards count; your tested hypothesis can count once. Fictional speech is not primary testimony.');
-      env.paragraph(criteria, 'This is a local pattern check. Passing it does not settle history or confirm authorship. Confirmed outside authorship must be disqualified by teacher review outside this game.'); body.appendChild(criteria);
+      env.paragraph(criteria, 'This is a local pattern check. Passing it does not settle history or confirm authorship. Confirmed outside authorship must be disqualified by teacher review outside this game.');
       var ta = input('textarea', 'Write your own answer', 'essay-text'); ta.rows = 8; ta.maxLength = 20000; ta.value = s.essay;
       var count = env.el('p', 'word-count'), warning = env.el('p'); warning.id = 'paste-warning'; warning.setAttribute('role', 'status'); body.append(count, warning);
       var result = env.el('div'); result.id = 'essay-result'; result.setAttribute('role', 'status'); body.appendChild(result);
+      body.appendChild(criteria);
       var finish = null, pending = 0, lastInput = null, burstStart = null, burstChars = 0;
       // Store edit deltas, not a full essay copy per keystroke. Native history may group multiple edits.
       var edits = [], editIndex = 0;

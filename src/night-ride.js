@@ -287,7 +287,7 @@
       var d = state.dawn;
       setText(objective, !d.met ? 'Meet Parker at the marked stop. Speech is dramatized. [FORMATION] [COMMAND]' :
         !d.delivered ? 'Deliver Parker\'s invented message to the marked fictional militiaman.' :
-        d.listened.length < 2 ? 'Compare the listening spots. Recorded ' + d.listened.length + '/2. [COMMAND]' :
+        d.listened.length < 2 ? 'Message delivered. Compare the listening spots. Recorded ' + d.listened.length + '/2. [COMMAND]' :
         d.questions.length < 2 ? 'Ask the fictional witnesses about their reports. Asked ' + d.questions.length + '/2.' :
         'Find the spectator boundary and record the limits of what you heard.');
       return;
