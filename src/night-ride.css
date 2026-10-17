@@ -220,7 +220,9 @@
   position:relative; margin:12px 6px 14px 0; padding:12px 16px 12px 18px; font-style:italic; font-size:16px; line-height:1.5;
   background:var(--paper-hi); border:1px solid rgba(36,27,18,.6); border-left:5px solid var(--wax); box-shadow:3px 3px 0 rgba(36,27,18,.35);
 }
-.wl .document-image { display:block; width:100%; height:auto; margin:12px 0 14px; padding:6px; background:var(--paper-hi); border:3px solid var(--ink); box-shadow:4px 4px 0 var(--ink); }
+.wl .document-image { display:block; width:100%; height:auto; max-height:30vh; object-fit:contain; margin:12px 0 14px; padding:6px; background:var(--paper-hi); border:3px solid var(--ink); box-shadow:4px 4px 0 var(--ink); }
+.wl .essay-criteria summary { min-height:44px; padding:10px 0; cursor:pointer; }
+.wl .essay-criteria summary:focus-visible { outline:3px solid var(--ink); outline-offset:3px; }
 .wl .card label { display:block; margin:14px 0 5px; font:400 18px/1.2 var(--display); color:var(--ink); }
 .wl .card select, .wl .card textarea {
   display:block; width:100%; min-height:44px; padding:9px 12px; font-size:16px; color:var(--ink);
