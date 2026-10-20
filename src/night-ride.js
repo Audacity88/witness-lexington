@@ -116,7 +116,6 @@
   studyNotice.setAttribute('role', 'status'); overlay.appendChild(card); host.appendChild(overlay);
   var dialog = document.createElement('dialog'); host.appendChild(dialog);
   dialog.addEventListener('close', function () {
-    clearMovement();
     placeMusic();
     if (modalReturn && modalReturn.isConnected && !modalReturn.disabled && modalReturn.getClientRects().length) modalReturn.focus();
     else if (playable()) interactButton.focus();
@@ -370,7 +369,7 @@
       sourceNote(dialog, 'Dramatized dialogue. Invented words, not a quotation.', '[FORMATION] [COMMAND]');
       paragraph(dialog, B.parker);
       paragraph(dialog, 'Fictional errand: carry a reminder to the marked militiaman to listen for orders. Eli does not cause any historical order or outcome.');
-      dialog.appendChild(button(d.met ? 'Continue the muster' : 'Accept the message', function () { d.met = true; modalReturn = W.canvas; dialog.close(); render(); save(); }, 'accept-message', true));
+      dialog.appendChild(button(d.met ? 'Continue the muster' : 'Accept the message', function () { clearMovement(); d.met = true; modalReturn = W.canvas; dialog.close(); render(); save(); }, 'accept-message', true));
     } else if (s.id === 'near' || s.id === 'far') {
       sourceNote(dialog, 'Dramatized hearing experiment. Displayed text represents hearing; this scene is silent.', '[COMMAND]');
       paragraph(dialog, B.hearing[s.id]);
