@@ -59,6 +59,17 @@ function alarm(g) {
  for(const id of ['lantern','orchard']){g.travel(id,id==='lantern'?28:10);g.click('record-alarm');}g.travel('parsonage',44);
 }
 function routes(game) {return game.host.querySelectorAll('button').filter(node=>node.id?.startsWith('travel-')).map(node=>node.id.slice(7));}
+check('Accepting Parker returns focus to the scene for WASD and arrow walking',()=>{
+ const game=boot();alarm(game);game.click('continue-dawn');game.click('start-muster');game.click('interact');
+ game.key('d');game.frames(6);game.release('d');assert.equal(game.snap().run.dawn.x,-11);
+ game.click('accept-message');
+ const canvas=game.host.querySelector('canvas');assert.equal(canvas.tabindex,'-1');assert.equal(game.doc.activeElement,canvas);
+ for(const movement of [{key:'d',axis:'x',direction:1},{key:'ArrowRight',axis:'x',direction:1},{key:'ArrowLeft',axis:'x',direction:-1},{key:'ArrowUp',axis:'z',direction:-1},{key:'ArrowDown',axis:'z',direction:1}]){
+  const before=game.snap().run.dawn[movement.axis];game.key(movement.key);game.frames(6);game.release(movement.key);
+  assert((game.snap().run.dawn[movement.axis]-before)*movement.direction>0,movement.key+' moves immediately after Accept');
+ }
+ game.click('pause');const paused=game.snap().run.dawn.x;game.key('d');game.frames(6);game.release('d');assert.equal(game.snap().run.dawn.x,paused);
+});
 function muster(g) {
  g.click('continue-dawn');g.click('start-muster');assert.deepEqual(routes(g),['parker']);g.click('interact');g.click('accept-message');
  assert.deepEqual(routes(g),['militia']);g.walkTo('militia');assert(!g.doc.getElementById('ask-militia'));g.click('deliver-message');
