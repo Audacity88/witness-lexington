@@ -20,7 +20,7 @@ const reports = [];
 // or anything else; at 960x540 and larger they must not wrap. Scene labels must sit inside the viewport, clear of the HUD and of each
 // other, with text at least 14px.
 function audit() {
-  const out = { small: [], tinyText: [], hiddenPrimary: [], clipped: [], wrapped: [], labels: [] };
+  const out = { small: [], tinyText: [], hiddenPrimary: [], clipped: [], wrapped: [], labels: [], hiddenWriting: [] };
   const shown = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width && r.height && s.visibility !== 'hidden' && s.display !== 'none'; };
   const overlay = document.querySelector('.overlay'), overlayUp = overlay && !overlay.hidden && shown(overlay);
   const root = document.querySelector('dialog[open]') || (overlayUp ? overlay : document);
@@ -54,8 +54,8 @@ function audit() {
     const placed = [], snap = WitnessGame.snapshot(), run = snap.run, d = run.dawn, g = run.green;
     // The objective's stops, derived here from the run state independently of the game's own focus list.
     const expected = run.phase === 'ride' ? (!run.accepted || run.visited.length === 2 ? ['parsonage'] : ['lantern', 'orchard'].filter(id => !run.visited.includes(id)))
-      : run.phase === 'muster' ? (!d.met ? ['parker'] : d.delivered && d.listened.length === 2 && d.questions.length === 2 ? (d.boundary ? [] : ['boundary'])
-        : ['militia', 'near', 'far', 'town'].filter(id => id === 'militia' ? !(d.delivered && d.questions.includes(id)) : id === 'town' ? !d.questions.includes(id) : !d.listened.includes(id)))
+      : run.phase === 'muster' ? (!d.met ? ['parker'] : !d.delivered ? ['militia'] : d.listened.length < 2 ? ['near', 'far'].filter(id => !d.listened.includes(id))
+        : d.questions.length < 2 ? ['militia', 'town'].filter(id => !d.questions.includes(id)) : d.boundary ? [] : ['boundary'])
       : run.phase === 'green' && !g.sheltered ? ['corner', 'edge'] : run.phase === 'shelter' && !g.sheltered ? ['shelter'] : [];
     for (const id of expected) {
       const l = snap.labels.find(l => l.id === id);
@@ -77,7 +77,7 @@ function audit() {
       placed.push(r);
     }
   }
-  root.querySelectorAll('button, a[href], select, textarea').forEach(e => {
+  root.querySelectorAll('button, a[href], select, textarea, summary').forEach(e => {
     if (!shown(e) || e.closest('[hidden]')) return;
     const r = e.getBoundingClientRect(); if (r.height < 44 || r.width < 44) out.small.push((e.id || e.textContent.trim()).slice(0, 40) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
   });
@@ -98,6 +98,11 @@ function audit() {
     if (e.closest('dialog')) { const d = e.closest('dialog').getBoundingClientRect(); ok = ok && r.bottom <= d.bottom && r.top >= d.top; }
     if (!ok) out.hiddenPrimary.push(e.id || e.textContent.trim());
   });
+  const writing = root.querySelector('#essay-text'), scroller = writing && writing.closest('.card-scroll');
+  if (writing && scroller.scrollTop < 1) {
+    const field = writing.getBoundingClientRect(), body = scroller.getBoundingClientRect();
+    if (field.top < body.top || field.top + 52 > body.bottom || field.top + 52 > innerHeight) out.hiddenWriting.push('Essay entry begins below the fold');
+  }
   return out;
 }
 try {
@@ -152,11 +157,12 @@ try {
       await click('#skip'); await shot('03-blackout');
       await click('#rewind'); await shot('04-rewind');
       await click('#start-ride'); await click('#interact'); await click('#ask-source'); await shot('05-dialog-revere'); await musicStates('05-dialog-revere-music');
-      await click('#accept'); await ride('lantern', 28); await shot('06-ride-household'); await musicStates('06-ride-music');
+      await click('#hear-errand'); await shot('05-dialog-errand'); await click('#accept'); await ride('lantern', 28); await shot('06-ride-household'); await musicStates('06-ride-music');
       await click('#interact'); await click('#record-alarm'); await ride('orchard', 10); await check('ride-orchard'); await click('#interact'); await click('#record-alarm');
       await ride('parsonage', 44); await click('#interact'); await phase('complete'); await shot('07-checkpoint');
       await click('#continue-dawn'); await click('#start-muster'); await shot('08-muster-parker');
       await click('#interact'); await shot('09-dialog-parker'); await click('#accept-message');
+      await walk('militia'); await click('#interact'); await click('#deliver-message'); await shot('09-message-delivered');
       await walk('near'); await shot('10-muster-listening-spot');
       await click('#pause'); await audioState('suspended');
       const pausedTime = await page.evaluate(() => window.__wlAudio.currentTime);
@@ -166,7 +172,7 @@ try {
       await shot('26-resumed-muted'); await click('#music'); await audioState('running'); await shot('26-resumed-unmuted');
       await click('#interact'); await shot('11-dialog-listening'); await click('#record-listening');
       await walk('far'); await check('muster-at-far'); await click('#interact'); await click('#record-listening');
-      await walk('militia'); await check('muster-at-militia'); await click('#interact'); await click('#deliver-message'); await click('#ask-militia'); await shot('12-dialog-militiaman'); await click('#close-dialog');
+      await walk('militia'); await check('muster-at-militia'); await click('#interact'); await click('#ask-militia'); await shot('12-dialog-militiaman'); await click('#close-dialog');
       await walk('town'); await check('muster-at-town'); await click('#interact'); await click('#ask-town'); await click('#close-dialog');
       await walk('boundary'); await shot('27-muster-boundary'); await click('#interact'); await click('#finish-muster'); await phase('muster-complete');
       await click('#continue-green'); await phase('green'); await shot('13-green-spots'); await musicStates('13-green-music');
@@ -176,11 +182,19 @@ try {
       await click('#enter-study'); await phase('study'); await shot('16-evidence-room'); await musicStates('16-evidence-music');
       await page.select('#document', 'doolittle'); await shot('17-evidence-doolittle');
       for (const id of await page.evaluate(() => WG_DATA.cards.map(c => c.id))) { await page.select('#document', id); await click('#inspect'); }
-      await page.select('#rank-0', 'barker'); await page.select('#rank-1', 'revere1775');
-      await click('#limitation'); await page.keyboard.type('The diary gives one observer\u2019s account and cannot establish every view.');
-      await page.$eval('.card-scroll', e => { e.scrollTop = e.scrollHeight; }); await shot('18-evidence-ranking');
       await click('#study-notebook'); await shot('19-notebook'); await musicStates('19-notebook-music'); await click('#close-dialog');
+      await click('#rank-sources');
+      await page.select('#rank-0', 'barker'); await page.select('#rank-1', 'revere1775');
+      await shot('18-evidence-ranking'); await click('#rank-next');
+      await click('#limitation'); await page.keyboard.type('The diary gives one observer\u2019s account and cannot establish every view.');
+      await shot('18-evidence-limitation');
       await click('#choose-belief'); await shot('20-belief'); await click('#belief-unsure'); await phase('hypothesis');
+      for (const step of ['account', 'shooter', 'location']) {
+        await shot('21-hypothesis-' + step);
+        if (step === 'account') { await click('#review-choices'); await shot('21-hypothesis-review'); await click('#review-choices'); }
+        await click('#hypothesis-next');
+      }
+      await shot('21-hypothesis-aftermath');
       await click('#check-hypothesis'); await shot('21-hypothesis-fits');
       await page.select('#aftermath', 'stopped'); await click('#check-hypothesis'); await shot('22-hypothesis-contradicts');
       await page.select('#aftermath', 'fewshots'); await click('#check-hypothesis'); await click('#write-essay'); await phase('essay');

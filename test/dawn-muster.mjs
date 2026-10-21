@@ -44,11 +44,25 @@ try {
       await click('#interact');
     }
     async function walkTo(id) {
-      await click('#travel-' + id);
-      await page.waitForFunction(id => {
-        const s = WL_DAWN.stops.find(s => s.id === id), d = WitnessGame.snapshot();
-        return Math.hypot(d.run.dawn.x - s.x, d.run.dawn.z - s.z) < 0.13 && !d.assisted;
-      }, { timeout: 30000 }, id);
+      if (await page.$('#travel-' + id)) {
+        await click('#travel-' + id);
+        await page.waitForFunction(id => {
+          const s = WL_DAWN.stops.find(s => s.id === id), d = WitnessGame.snapshot();
+          return Math.hypot(d.run.dawn.x - s.x, d.run.dawn.z - s.z) < 0.13 && !d.assisted;
+        }, { timeout: 30000 }, id);
+      } else {
+        const stop = await page.evaluate(id => WL_DAWN.stops.find(stop => stop.id === id), id);
+        await page.bringToFront();
+        for (const [axis, negative, positive] of [['x', 'a', 'd'], ['z', 'w', 's']]) {
+          const distance = stop[axis] - (await snapshot()).run.dawn[axis];
+          if (Math.abs(distance) < 0.3) continue;
+          const direction = Math.sign(distance), key = direction < 0 ? negative : positive;
+          await page.keyboard.down(key);
+          try {
+            await page.waitForFunction((axis, target, direction) => (target - WitnessGame.snapshot().run.dawn[axis]) * direction < 0.3, { timeout: 30000 }, axis, stop[axis], direction);
+          } finally { await page.keyboard.up(key); }
+        }
+      }
       await click('#interact');
     }
     let failure = null;
@@ -57,7 +71,7 @@ try {
       await page.evaluate(() => localStorage.removeItem('witness-lexington-s1-v1'));
       await page.reload({ waitUntil: 'load' });
       await click('#begin'); await click('#skip'); await click('#rewind'); await click('#start-ride');
-      await click('#interact'); await click('#ask-source'); await click('#accept');
+      await click('#interact'); await click('#ask-source'); await click('#hear-errand'); await click('#accept');
       for (const id of ['lantern', 'orchard']) { await travel(id, id === 'lantern' ? 28 : 10); await click('#record-alarm'); }
       await travel('parsonage', 44); await phase('complete');
       // pagehide saves the live run. Convert it after navigation, before app startup.
@@ -87,15 +101,22 @@ try {
       check('Keyboard walks on foot', (await snapshot()).run.dawn.x > -11);
       await walkTo('boundary');
       check('Early boundary cannot finish the muster', await page.$('#finish-muster') === null);
+      check('Boundary cannot skip the required relay', !(await snapshot()).run.dawn.delivered && await page.$('#finish-muster') === null);
       await click('#close-dialog');
-      await click('#travel-' + order[0]); await click('#pause'); const before = await snapshot();
+      await click('#travel-militia'); await click('#pause'); const before = await snapshot();
       await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift');
       check('Pause keeps keyboard focus in its overlay', await page.evaluate(() => document.activeElement.id === (document.getElementById('music').disabled ? 'resume' : 'music')));
       await new Promise(r => setTimeout(r, 200));
       check('Pause freezes walking', JSON.stringify((await snapshot()).run.dawn) === JSON.stringify(before.run.dawn));
-      await click('#resume'); await click('#travel-' + order[0]); await click('#notebook'); const note = await snapshot();
+      await click('#resume'); await click('#travel-militia'); await click('#notebook'); const note = await snapshot();
       await new Promise(r => setTimeout(r, 200));
       check('Notebook stops movement and assistance', JSON.stringify((await snapshot()).run.dawn) === JSON.stringify(note.run.dawn) && !(await snapshot()).assisted);
+      await click('#close-dialog');
+      await walkTo('militia'); await click('#deliver-message');
+      check('Delivery confirmed before listening', (await snapshot()).run.dawn.delivered && await page.$eval('.panel > p', e => e.textContent.includes('Message delivered.')));
+      await click('#interact');
+      check('Delivery cannot be repeated', await page.$('#deliver-message') === null);
+      check('Witness question waits for both listening spots', await page.$('#ask-militia') === null);
       await click('#close-dialog');
       await walkTo(order[0]); await shot(order[0] + '-listening');
       check('Listening experiment has source and dramatization labels', await page.$eval('dialog', e => e.textContent.includes('Dramatized hearing experiment') && e.textContent.includes('[COMMAND]')));
@@ -111,10 +132,6 @@ try {
       check('Townsperson reports secondhand information', await page.$eval('dialog', e => e.textContent.includes('Fictional character') && e.textContent.includes('did not see the column')));
       await click('#close-dialog'); await walkTo('militia'); await click('#ask-militia'); await shot('militiaman');
       check('Militiaman reports only partial hearing', await page.$eval('dialog', e => e.textContent.includes('I could not hear the rest.')));
-      await click('#close-dialog'); await walkTo('boundary');
-      check('Listening and dialogue alone cannot skip relay', await page.$('#finish-muster') === null);
-      await click('#close-dialog'); await walkTo('militia'); await click('#deliver-message');
-      check('Delivery cannot be repeated', await page.$eval('#deliver-message', e => e.disabled));
       await click('#close-dialog'); await walkTo('boundary'); await shot('boundary'); await click('#finish-muster');
       await phase('muster-complete'); await shot('checkpoint');
       check('Both listening orders finish', JSON.stringify((await snapshot()).run.dawn.listened) === JSON.stringify(order));

@@ -74,49 +74,52 @@
     }
     function showDocument() {
       var s = g(), c = D.cards.find(function (c) { return c.id === s.document; });
-      showCard('Evidence room · modern study', 'Read each source, then compare usefulness. This room is outside the 1775 story.');
+      showCard(c.id === 'doolittle' ? c.title + ' · ' + c.date : 'Evidence room · modern study', c.id === 'doolittle' ? c.flag + ' ' + c.source : 'Read each source, then compare usefulness. This room is outside the 1775 story.');
+      if (c.id === 'doolittle') { var im = env.el('img'); im.src = window.WG_DOOLITTLE_SRC || 'assets/doolittle-plate1.webp'; im.alt = D.room.doolittle.alt; im.className = 'document-image'; body.appendChild(im); }
       add('Inspected ' + s.inspected.length + '/9. Sources are shown individually; your draft stays on this device.', 'ledger');
       var pips = env.el('div', 'pips'); pips.setAttribute('aria-hidden', 'true');
       D.cards.forEach(function (card) { pips.appendChild(env.el('span', s.inspected.includes(card.id) ? 'pip done' : card.id === c.id ? 'pip current' : 'pip')); });
       body.appendChild(pips);
       select('Choose one document', 'document', D.cards.map(function (c) { return [c.id, c.title]; }), c.id, function (v) { s.document = v; render(); });
-      body.appendChild(env.el('h2', '', c.title + (c.date ? ' · ' + c.date : ''))); source(c);
-      if (c.id === 'doolittle') { var im = env.el('img'); im.src = window.WG_DOOLITTLE_SRC || 'assets/doolittle-plate1.webp'; im.alt = D.room.doolittle.alt; im.className = 'document-image'; body.appendChild(im); }
-      else if (c.kind === 'testimony') add('Original scan not included. This card uses a cited excerpt or labeled paraphrase.');
+      if (c.id !== 'doolittle') body.appendChild(env.el('h2', '', c.title + (c.date ? ' · ' + c.date : ''))); source(c);
+      if (c.id !== 'doolittle' && c.kind === 'testimony') add('Original scan not included. This card uses a cited excerpt or labeled paraphrase.');
       if (c.quotes) c.quotes.forEach(function (q) { body.appendChild(env.el('blockquote', '', q)); });
       if (c.summary) add((c.id === 'numbers' ? 'Reconstruction estimate: ' : 'Document paraphrase: ') + c.summary);
       if (c.flag) add(c.flag, 'tag'); add(c.limit);
       b(s.inspected.includes(c.id) ? 'Already inspected' : 'Record this source as inspected', function () { s.inspected.push(c.id); save(); render(); }, 'inspect', true).disabled = s.inspected.includes(c.id);
       var index = D.cards.indexOf(c);
       b('Next document', function () { s.document = D.cards[(index + 1) % D.cards.length].id; save(); render(); }, 'next-document');
-      if (s.inspected.length === 9) ranking();
+      if (s.inspected.length === 9) b('Rank two sources', ranking, 'rank-sources', true);
       if (s.hypothesis) b('Return to my essay draft', function () {
         if (valid(s, 'essay')) env.go('essay');
       }, 'return-essay').disabled = !valid(s, 'essay');
       b('My scene notebook', env.notebook, 'study-notebook');
     }
     function ranking() {
-      var s = g(); body.appendChild(env.el('h2', '', 'Rank two sources by usefulness'));
-      add('Choose the more useful source first. Explain a limitation in your own words. This reflection has no numerical score or official order.');
+      var s = g(), pair = s.rank.slice();
+      showCard('Rank two sources by usefulness', 'Choose the more useful source first. There is no numerical score or official order.');
       ['First', 'Second'].forEach(function (label, i) {
         select(label + ' source', 'rank-' + i, [['', 'Choose a source']].concat(D.cards.map(function (c) { return [c.id, c.title]; })), s.rank[i] || '', function (v) {
-          var other = env.card.querySelector('#rank-' + (1 - i)).value;
-          s.rank = i === 0 ? [v, other] : [other, v]; s.rank = s.rank.filter(Boolean);
+          pair[i] = v;
           ready();
         });
       });
-      var note = input('textarea', 'One limitation of a chosen source', 'limitation'); note.maxLength = 2000; note.value = s.limitation;
-      note.addEventListener('input', function () { s.limitation = note.value; ready(); save(); });
-      var next = b('Choose a provisional account', function () { belief(); }, 'choose-belief', true);
+      var next = b('Explain a limitation', limitation, 'rank-next', true);
+      b('Inspect documents', showDocument, 'rank-documents');
       function ready() {
-        var a = env.card.querySelector('#rank-0').value, b = env.card.querySelector('#rank-1').value;
-        next.disabled = !a || !b || a === b || s.limitation.trim().length < 12;
-        // Only persist a valid distinct ordered pair. Empty selection is incomplete.
-        s.rank = a && b && a !== b ? [a, b] : [];
-        var back = env.card.querySelector('#return-essay');
-        if (back) back.disabled = !valid(s, 'essay');
+        next.disabled = !pair[0] || !pair[1] || pair[0] === pair[1];
+        s.rank = next.disabled ? [] : pair.slice();
       }
       ready();
+    }
+    function limitation() {
+      var study = g();
+      showCard('What is one limit of your evidence?', 'Explain a limitation of one of your two ranked sources in your own words.');
+      study.rank.forEach(function (id, index) { add((index + 1) + '. ' + D.cards.find(function (card) { return card.id === id; }).title); });
+      var note = input('textarea', 'One limitation of a chosen source', 'limitation'); note.maxLength = 2000; note.value = study.limitation;
+      note.addEventListener('input', function () { study.limitation = note.value; next.disabled = !ranked(study); save(); });
+      var next = b('Choose a provisional account', belief, 'choose-belief', true); next.disabled = !ranked(study);
+      b('Back to ranks', ranking, 'limitation-back');
     }
     function belief() {
       showCard('What do you believe so far?', 'A provisional belief is revisable. Testing an account does not prove it happened.');
@@ -124,23 +127,43 @@
         b(o[1], function () { g().belief = o[0]; draft = null; env.go('hypothesis'); }, 'belief-' + o[0], true);
       });
     }
-    function hypothesis() {
+    function reviewChoices() {
+      var review = env.el('details', 'review-choices'), summary = env.el('summary', '', 'Review belief or documents'); summary.id = 'review-choices'; review.appendChild(summary);
+      review.appendChild(env.button('Change provisional belief', belief, 'change-belief'));
+      review.appendChild(env.button('Inspect documents', function () { env.go('study'); }, 'hypothesis-documents'));
+      body.appendChild(review);
+    }
+    function hypothesis(step) {
+      step = step || 'account';
       var s = g(), old = draft || s.hypothesis && s.hypothesis.version;
       var v = old ? Object.assign({}, old) : Object.assign({ side: s.belief === 'british' ? 'british' : 'militia' }, D.sides[s.belief === 'british' ? 'british' : 'militia'].preset);
-      showCard('Test a hypothesis', 'Choose a shooter, an allowed location, and what follows. These are proposed possibilities, not a replay of a known first shot.');
-      add('Your provisional belief: ' + (s.belief === 'unsure' ? 'uncertain' : s.belief === 'militia' ? 'regulars may have fired first' : 'militia may have fired first') + '.');
-      select('Account to test', 'account', Object.entries(D.sides).map(function (e) { return [e[0], e[1].label]; }), v.side, function (side) {
-        // Changing accounts explicitly chooses its inherited preset, without changing belief.
-        draft = Object.assign({ side: side }, D.sides[side].preset); render();
-      });
-      select('Possible shooter', 'shooter', Object.entries(D.shooters).map(function (e) { return [e[0], e[1].label]; }), v.shooter, function (id) {
-        v.shooter = id; if (!D.shooters[id].zones.includes(v.location)) v.location = D.shooters[id].zones[0];
-        location.replaceChildren(); zones(); clearResult();
-      });
-      var location = input('select', 'Allowed location', 'location');
-      function zones() { D.shooters[v.shooter].zones.forEach(function (id) { var o = env.el('option', '', D.zones[id].label); o.value = id; location.appendChild(o); }); location.value = v.location; }
-      zones(); location.addEventListener('change', function () { v.location = location.value; clearResult(); });
-      select('Aftermath', 'aftermath', Object.entries(D.aftermaths).map(function (e) { return [e[0], e[1].label]; }), v.aftermath, function (id) { v.aftermath = id; clearResult(); });
+      var titles = { account: 'Choose an account to test', shooter: 'Choose a possible shooter', location: 'Choose an allowed location', aftermath: 'Choose what follows' };
+      showCard(titles[step], 'This is a proposed possibility, not a replay of a known first shot.');
+      function nextStep(next) { draft = Object.assign({}, v); hypothesis(next); }
+      if (step === 'account') {
+        add('Your provisional belief: ' + (s.belief === 'unsure' ? 'uncertain' : s.belief === 'militia' ? 'regulars may have fired first' : 'militia may have fired first') + '. Testing the other account will not change your belief.');
+        select('Account to test', 'account', Object.entries(D.sides).map(function (entry) { return [entry[0], entry[1].label]; }), v.side, function (side) {
+          Object.assign(v, { side: side }, D.sides[side].preset); draft = Object.assign({}, v);
+        });
+        b('Choose a shooter', function () { nextStep('shooter'); }, 'hypothesis-next', true);
+      } else if (step === 'shooter') {
+        select('Possible shooter', 'shooter', Object.entries(D.shooters).map(function (entry) { return [entry[0], entry[1].label]; }), v.shooter, function (id) {
+          v.shooter = id; if (!D.shooters[id].zones.includes(v.location)) v.location = D.shooters[id].zones[0]; draft = Object.assign({}, v);
+        });
+        b('Choose a location', function () { nextStep('location'); }, 'hypothesis-next', true);
+        b('Back to account', function () { nextStep('account'); }, 'hypothesis-back');
+      } else if (step === 'location') {
+        add('Possible shooter: ' + D.shooters[v.shooter].label);
+        select('Allowed location', 'location', D.shooters[v.shooter].zones.map(function (id) { return [id, D.zones[id].label]; }), v.location, function (id) { v.location = id; draft = Object.assign({}, v); });
+        b('Choose the aftermath', function () { nextStep('aftermath'); }, 'hypothesis-next', true);
+        b('Back to shooter', function () { nextStep('shooter'); }, 'hypothesis-back');
+      }
+      if (step !== 'aftermath') {
+        reviewChoices();
+        return;
+      }
+      add('Possible shooter: ' + D.shooters[v.shooter].label + '. Location: ' + D.zones[v.location].label + '.');
+      select('Aftermath', 'aftermath', Object.entries(D.aftermaths).map(function (entry) { return [entry[0], entry[1].label]; }), v.aftermath, function (id) { v.aftermath = id; draft = Object.assign({}, v); clearResult(); });
       var writeAction = null;
       function clearResult() { result.replaceChildren(); result.className = ''; if (writeAction) { writeAction.remove(); writeAction = null; } }
       var result = env.el('div'); result.id = 'hypothesis-result'; result.setAttribute('role', 'status'); body.appendChild(result);
@@ -159,16 +182,20 @@
         }, 'write-essay', true) : null;
         revealResult(result);
       }, 'check-hypothesis', true);
-      b('Change provisional belief', belief, 'change-belief'); b('Inspect documents', function () { env.go('study'); }, 'hypothesis-documents');
+      b('Back to location', function () { nextStep('location'); }, 'hypothesis-back');
+      reviewChoices();
     }
     function finishFocus(continueFocus) { if (focusSince !== null) { g().tel.msFocused += performance.now() - focusSince; focusSince = continueFocus ? performance.now() : null; } }
     function essay() {
       var s = g(); showCard('Your answer', E.question);
-      add('Use at least ' + E.minRefs + ' evidence references and at least ' + E.minWords + ' words. Write at least three distinct claim sentences of five or more words each, connect evidence to your conclusion, and keep each sentence focused on one or two sources or facts. Use source details in complete claims and avoid repeated sentences or keyword lists. Address the opposing account and weigh it. Inspected historical cards count; your tested hypothesis can count once. Fictional speech is not primary testimony.');
-      add('This is a local pattern check. Passing it does not settle history or confirm authorship. Confirmed outside authorship must be disqualified by teacher review outside this game.');
+      add('Use at least ' + E.minRefs + ' evidence references. Weigh the opposing account. Write at least ' + E.minWords + ' words.');
+      var criteria = env.el('details', 'essay-criteria'), summary = env.el('summary', '', 'Full writing criteria and review limits'); summary.id = 'essay-criteria'; criteria.appendChild(summary);
+      env.paragraph(criteria, 'Write at least three distinct claim sentences of five or more words each, connect evidence to your conclusion, and keep each sentence focused on one or two sources or facts. Use source details in complete claims and avoid repeated sentences or keyword lists. Address the opposing account and weigh it. Inspected historical cards count; your tested hypothesis can count once. Fictional speech is not primary testimony.');
+      env.paragraph(criteria, 'This is a local pattern check. Passing it does not settle history or confirm authorship. Confirmed outside authorship must be disqualified by teacher review outside this game.');
       var ta = input('textarea', 'Write your own answer', 'essay-text'); ta.rows = 8; ta.maxLength = 20000; ta.value = s.essay;
       var count = env.el('p', 'word-count'), warning = env.el('p'); warning.id = 'paste-warning'; warning.setAttribute('role', 'status'); body.append(count, warning);
       var result = env.el('div'); result.id = 'essay-result'; result.setAttribute('role', 'status'); body.appendChild(result);
+      body.appendChild(criteria);
       var finish = null, pending = 0, lastInput = null, burstStart = null, burstChars = 0;
       // Store edit deltas, not a full essay copy per keystroke. Native history may group multiple edits.
       var edits = [], editIndex = 0;

@@ -65,7 +65,7 @@ try {
       await reloadAndResume(); await phase('rewind'); await click('#start-ride');
       await page.keyboard.press('e'); await shot('revere');
       check('Revere speech is labeled', await page.$eval('dialog', e => e.textContent.includes('Dramatized dialogue') && e.textContent.includes('not a quotation')));
-      await click('#ask-source'); await click('#accept');
+      await click('#ask-source'); await click('#hear-errand'); await click('#accept');
       await page.bringToFront(); await page.keyboard.down('w');
       try {
         await new Promise(r => setTimeout(r, 300));

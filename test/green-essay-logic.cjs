@@ -52,12 +52,62 @@ check('Game Resume preserves a muted preference',()=>{
  assert.equal(game.doc.getElementById('music').textContent,'Play music');
  assert.equal(game.doc.getElementById('music')['aria-label'],'Play music');
 });
-function alarm(g) { g.click('begin');g.click('skip');g.click('rewind');g.click('start-ride');g.click('interact');g.click('ask-source');g.click('accept');for(const id of ['lantern','orchard']){g.travel(id,id==='lantern'?28:10);g.click('record-alarm');}g.travel('parsonage',44); }
-function muster(g) {g.click('continue-dawn');g.click('start-muster');g.click('interact');g.click('accept-message');for(const id of ['near','far']){g.walkTo(id);g.click('record-listening');}g.walkTo('militia');g.click('deliver-message');g.click('ask-militia');g.click('close-dialog');g.walkTo('town');g.click('ask-town');g.click('close-dialog');g.walkTo('boundary');g.click('finish-muster');}
+function alarm(g) {
+ g.click('begin');g.click('skip');g.click('rewind');g.click('start-ride');g.click('interact');
+ assert(!g.doc.getElementById('accept'));g.click('ask-source');assert(!g.doc.getElementById('ask-source'));assert(!g.doc.getElementById('accept'));
+ g.click('hear-errand');assert(!g.doc.getElementById('ask-source'));g.click('accept');
+ for(const id of ['lantern','orchard']){g.travel(id,id==='lantern'?28:10);g.click('record-alarm');}g.travel('parsonage',44);
+}
+function routes(game) {return game.host.querySelectorAll('button').filter(node=>node.id?.startsWith('travel-')).map(node=>node.id.slice(7));}
+check('Accepting Parker returns focus to the scene for WASD and arrow walking',()=>{
+ const game=boot();alarm(game);game.click('continue-dawn');game.click('start-muster');game.click('interact');
+ game.key('d');game.frames(6);game.release('d');assert.equal(game.snap().run.dawn.x,-11);
+ game.click('accept-message');
+ const canvas=game.host.querySelector('canvas');assert.equal(canvas.tabindex,'-1');assert.equal(game.doc.activeElement,canvas);
+ for(const movement of [{key:'d',axis:'x',direction:1},{key:'ArrowRight',axis:'x',direction:1},{key:'ArrowLeft',axis:'x',direction:-1},{key:'ArrowUp',axis:'z',direction:-1},{key:'ArrowDown',axis:'z',direction:1}]){
+  const before=game.snap().run.dawn[movement.axis];game.key(movement.key);game.frames(6);game.release(movement.key);
+  assert((game.snap().run.dawn[movement.axis]-before)*movement.direction>0,movement.key+' moves immediately after Accept');
+ }
+ game.click('pause');const paused=game.snap().run.dawn.x;game.key('d');game.frames(6);game.release('d');assert.equal(game.snap().run.dawn.x,paused);
+});
+function muster(g) {
+ g.click('continue-dawn');g.click('start-muster');assert.deepEqual(routes(g),['parker']);g.click('interact');g.click('accept-message');
+ assert.deepEqual(routes(g),['militia']);g.walkTo('militia');assert(!g.doc.getElementById('ask-militia'));g.click('deliver-message');
+ assert(g.host.querySelector('.panel').textContent.includes('Message delivered.'));
+ assert.deepEqual(routes(g),['near','far']);g.click('interact');assert(!g.doc.getElementById('ask-militia'));assert(!g.doc.getElementById('deliver-message'));g.click('close-dialog');
+ for(const id of ['near','far']){g.walkTo(id);g.click('record-listening');}
+ assert.deepEqual(routes(g),['militia','town']);g.walkTo('militia');assert(!g.doc.getElementById('deliver-message'));g.click('ask-militia');g.click('close-dialog');
+ assert.deepEqual(routes(g),['town']);g.walkTo('town');g.click('ask-town');g.click('close-dialog');
+ assert.deepEqual(routes(g),['boundary']);g.walkTo('boundary');g.click('finish-muster');
+}
+function hypothesisSteps(game) {
+ for(const field of ['account','shooter','location']){assert(game.doc.getElementById(field));assert.equal(game.host.querySelectorAll('select').length,1);assert(!game.doc.getElementById('check-hypothesis'));const review=game.host.querySelector('details');assert(!review.open);assert(review.contains(game.doc.getElementById('change-belief')));assert(review.contains(game.doc.getElementById('hypothesis-documents')));assert(!game.host.querySelector('.card-actions').contains(game.doc.getElementById('change-belief')));game.click('hypothesis-next');}
+ assert(game.doc.getElementById('aftermath'));assert.equal(game.host.querySelectorAll('select').length,1);
+ assert(game.host.querySelector('details').contains(game.doc.getElementById('hypothesis-documents')));
+}
 function walkGreen(g,id) { g.click('travel-'+id);let n=0;while(g.snap().assisted&&n++<800)g.frame();assert(n<800);g.click('interact'); }
 function select(g,id,value){const n=g.doc.getElementById(id);assert(n,id);n.value=value;n.dispatch('change');}
 function type(g,id,text){const n=g.doc.getElementById(id);assert(n,id);n.focus();for(const ch of text){n.dispatch('keydown',{key:ch});g.key(ch);n.value=(n.value||'')+ch;n.dispatch('input');g.frame(90);}}
 function reload(g){const h=boot(g.storage);h.click('load');h.frame();return h;}
+check('Revere source reply resumes before the separate errand',()=>{
+ let game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');game.click('interact');game.click('ask-source');
+ game=reload(game);game.click('interact');assert(!game.doc.getElementById('ask-source'));assert(!game.doc.getElementById('accept'));
+ assert(game.host.querySelector('dialog').textContent.includes(game.ctx.WL_NIGHT.revere[1]));game.click('hear-errand');assert(!game.host.querySelector('dialog').textContent.includes(game.ctx.WL_NIGHT.revere[1]));game.click('accept');assert(game.snap().run.accepted);
+});
+check('Dawn checkpoints derive only the remaining task routes',()=>{
+ const game=boot();alarm(game);const saved=JSON.parse(game.storage[KEY]);saved.run.phase='muster';
+ const stages=[
+  [{met:false},['parker']],
+  [{met:true},['militia']],
+  [{met:true,listened:['near']},['militia']],
+  [{met:true,delivered:true},['near','far']],
+  [{met:true,delivered:true,listened:['far']},['near']],
+  [{met:true,delivered:true,listened:['near','far']},['militia','town']],
+  [{met:true,delivered:true,listened:['near','far'],questions:['town']},['militia']],
+  [{met:true,delivered:true,listened:['near','far'],questions:['militia','town']},['boundary']]
+ ];
+ for(const [progress,expected] of stages){const checkpoint=JSON.parse(JSON.stringify(saved));Object.assign(checkpoint.run.dawn,progress);const resumed=boot({[KEY]:JSON.stringify(checkpoint)});resumed.click('load');assert.deepEqual(routes(resumed),expected);}
+});
 const endings=[
  'I think the regulars fired first. Revere saw smoke in front of the troops but a house blocked his view of the militia. Barker says the militia fired one or two shots first. His diary is an opposing account, and I think his blame might reflect his own side. The documents disagree, so I cannot identify an individual from smoke alone. I would need more evidence to be certain.',
  'I think the militia fired first. Barker describes one or two shots first in his diary. The militia depositions say the regulars fired first, however their own side might have reasons to deny starting the firing. Revere had a house blocking his view, so his observation cannot tell us everything. I think the British account is more likely, but I would still compare dates and positions before making a stronger claim.',
@@ -78,7 +128,7 @@ for(const spot of ['corner','edge']) {
  g.frames(320);g.click('to-shelter');walkGreen(g,'shelter');
  check('Shelter checkpoint survives refresh '+spot,()=>{g=reload(g);assert.equal(g.snap().run.phase,'shelter');assert(g.doc.getElementById('enter-study'));assert(g.snap().run.green.sheltered);});
  g.click('shelter-notebook');check('Notebook separates Green from sources '+spot,()=>assert(g.host.querySelector('dialog').textContent.includes('not primary testimony')));g.click('close-dialog');g.click('enter-study');
- check('Ranking unavailable until all sources inspected '+spot,()=>assert(!g.doc.getElementById('rank-0')));
+ check('Ranking unavailable until all sources inspected '+spot,()=>{assert(!g.doc.getElementById('rank-0'));assert(!g.doc.getElementById('rank-sources'));});
  check('Music control survives document changes and notebook modal '+spot,()=>{
    g.click('next-document');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
    g.click('study-notebook');assert(g.host.querySelector('dialog').contains(g.doc.getElementById('music')));
@@ -87,21 +137,31 @@ for(const spot of ['corner','edge']) {
    g.click('close-dialog');assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));
  });
  for(const c of g.ctx.WG_DATA.cards){select(g,'document',c.id);if(c.id==='revere1775')assert(g.host.querySelector('.card').textContent.includes('Document paraphrase: Revere says'));g.click('inspect');assert(g.doc.getElementById('inspect').disabled);assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));}
- check('Both accounts and Doolittle framing inspected '+spot,()=>{assert.equal(g.snap().run.green.inspected.length,9);select(g,'document','doolittle');assert(g.host.textContent.includes('artist pictured'));});
+ check('Both accounts and Doolittle framing inspected '+spot,()=>{assert.equal(g.snap().run.green.inspected.length,9);select(g,'document','doolittle');assert(g.host.textContent.includes('artist pictured'));const body=g.host.querySelector('.card-scroll');assert(body.children.indexOf(body.querySelector('img'))<body.children.indexOf(g.doc.getElementById('document')));assert(!g.doc.getElementById('rank-0'));});
+ g.click('rank-sources');
  select(g,'rank-0','barker');select(g,'rank-1','barker');
- check('Duplicate ranking cannot continue '+spot,()=>assert(g.doc.getElementById('choose-belief').disabled));
- select(g,'rank-1','revere1775');type(g,'limitation','The diary is only one observer’s account.');g.click('choose-belief');g.click('belief-unsure');
+ check('Duplicate ranking cannot continue '+spot,()=>{assert(g.doc.getElementById('rank-next').disabled);assert(!g.doc.getElementById('limitation'));assert(!g.doc.getElementById('choose-belief'));});
+ select(g,'rank-1','revere1775');g.click('rank-next');assert(!g.doc.getElementById('rank-0'));assert(g.doc.getElementById('choose-belief').disabled);
+ type(g,'limitation','The diary is only one observer’s account.');g.click('limitation-back');assert.equal(g.doc.getElementById('rank-0').value,'barker');g.click('rank-next');assert.equal(g.doc.getElementById('limitation').value,'The diary is only one observer’s account.');g.click('choose-belief');g.click('belief-unsure');
+ hypothesisSteps(g);
+ check('Hypothesis Back keeps choices and constrains a changed shooter '+spot,()=>{
+   g.click('hypothesis-back');g.click('hypothesis-back');select(g,'shooter','hidden');g.click('hypothesis-next');select(g,'location','house');g.click('hypothesis-next');g.click('hypothesis-back');assert.equal(g.doc.getElementById('location').value,'house');
+   g.click('hypothesis-back');assert.equal(g.doc.getElementById('shooter').value,'hidden');select(g,'shooter','militiaman');g.click('hypothesis-next');assert.equal(g.doc.getElementById('location').value,'ranks');assert.deepEqual(g.doc.getElementById('location').children.map(option=>option.value),['ranks']);
+   g.click('hypothesis-back');select(g,'shooter','regular');g.click('hypothesis-next');g.click('hypothesis-next');
+ });
  g.click('check-hypothesis');check('Hypothesis result receives focus and scroll '+spot,()=>{const r=g.doc.getElementById('hypothesis-result');assert.equal(g.doc.activeElement,r);assert.equal(r.scrolled.block,'start');});check('Militia account preset accepted '+spot,()=>{assert(g.host.querySelector('#hypothesis-result').textContent.includes('Fits the inherited'));assert(g.snap().run.green.belief==='unsure');});
- select(g,'account','british');g.click('check-hypothesis');check('British preset also accepted '+spot,()=>assert(g.host.querySelector('#hypothesis-result').textContent.includes('Fits the inherited')));
+ for(let step=0;step<3;step++)g.click('hypothesis-back');select(g,'account','british');hypothesisSteps(g);g.click('check-hypothesis');check('British preset also accepted '+spot,()=>assert(g.host.querySelector('#hypothesis-result').textContent.includes('Fits the inherited')));
  for(const a of ['stopped','even']){select(g,'aftermath',a);g.click('check-hypothesis');check('Hard facts reject '+a+' '+spot,()=>{assert(g.host.querySelector('#hypothesis-result').textContent.includes('Contradicts the inherited'));assert(!g.doc.getElementById('write-essay'));assert(g.host.querySelector('#hypothesis-result').textContent.includes('[OUTCOME]'));assert(g.host.querySelector('#hypothesis-result').textContent.includes('Paul Revere'));});}
  select(g,'aftermath','fewshots');g.click('check-hypothesis');g.click('write-essay');
- check('Overlay Tab includes essay text and wraps form controls '+spot,()=>{g.doc.activeElement=g.host;g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-text');g.key('Tab',{shiftKey:true});assert.equal(g.doc.activeElement.id,'essay-notebook');g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-text');});
+ check('Overlay Tab includes collapsed essay criteria and wraps form controls '+spot,()=>{const details=g.host.querySelector('details');assert(!details.open);assert(details.textContent.includes('three distinct claim sentences'));assert.deepEqual(g.host.querySelectorAll('textarea, summary').map(control=>control.id),['essay-text','essay-criteria']);g.doc.activeElement=g.host;g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-text');g.key('Tab',{shiftKey:true});assert.equal(g.doc.activeElement.id,'essay-notebook');g.key('Tab');assert.equal(g.doc.activeElement.id,'essay-text');});
  type(g,'essay-text','I believe the regulars fired first.');g.click('check-essay');check('Short unsupported answer fails '+spot,()=>assert(!g.doc.getElementById('finish-investigation')));
  check('Paste, drop, beforeinput blocked '+spot,()=>{const n=g.doc.getElementById('essay-text');for(const kind of ['paste','drop']){let stopped=false;n.dispatch(kind,{preventDefault(){stopped=true;}});assert(stopped);}let stopped=false;n.dispatch('beforeinput',{inputType:'insertFromPaste',preventDefault(){stopped=true;}});assert(stopped);assert.equal(g.snap().run.green.tel.pasteAttempts,2);assert.equal(g.snap().run.green.tel.dropAttempts,1);});
  check('Page exit flushes focused time '+spot,()=>{const ta=g.doc.getElementById('essay-text');ta.focus();g.frames(20);g.events.pagehide.forEach(fn=>fn());assert(JSON.parse(g.storage[KEY]).run.green.tel.msFocused>=1000);});
  const draft=g.snap().run.green.essay;g.click('essay-documents');
  check('Cleared limitation disables and guards essay return '+spot,()=>{
+   g.click('rank-sources');g.click('rank-next');
    const note=g.doc.getElementById('limitation');note.value='';note.dispatch('input');
+   g.click('limitation-back');g.click('rank-documents');
    const back=g.doc.getElementById('return-essay');assert(back.disabled);
    back.disabled=false;back.dispatch('click');assert.equal(g.snap().run.phase,'study');
    assert(g.ctx.WL_SLICE.valid(g.snap().run.green,'study'));
@@ -110,15 +170,16 @@ for(const spot of ['corner','edge']) {
    g=reload(g);assert.equal(g.snap().run.phase,'study');assert(g.doc.getElementById('return-essay').disabled);
    assert.equal(g.snap().run.green.essay,draft);assert.equal(g.snap().run.visited.length,2);assert(g.snap().run.dawn.boundary);
  });
- check('Short limitation also blocks essay return '+spot,()=>{type(g,'limitation','Too short');assert(g.doc.getElementById('return-essay').disabled);});
+ check('Short limitation also blocks essay return '+spot,()=>{g.click('rank-sources');g.click('rank-next');type(g,'limitation','Too short');assert(g.doc.getElementById('choose-belief').disabled);g.click('limitation-back');g.click('rank-documents');assert(g.doc.getElementById('return-essay').disabled);g.click('rank-sources');g.click('rank-next');});
  const note=g.doc.getElementById('limitation');note.value='';note.dispatch('input');type(g,'limitation','The diary gives only one observer’s view.');
  check('Duplicate or cleared source selection blocks essay return '+spot,()=>{
-   select(g,'rank-1','barker');assert(g.doc.getElementById('return-essay').disabled);
-   select(g,'rank-1','');assert(g.doc.getElementById('return-essay').disabled);
+   g.click('limitation-back');select(g,'rank-1','barker');assert(g.doc.getElementById('rank-next').disabled);
+   g.click('rank-documents');assert(g.doc.getElementById('return-essay').disabled);g.click('rank-sources');
+   select(g,'rank-1','');assert(g.doc.getElementById('rank-next').disabled);g.click('rank-documents');assert(g.doc.getElementById('return-essay').disabled);
    g=reload(g);assert.equal(g.snap().run.phase,'study');assert.equal(g.snap().run.green.essay,draft);
  });
  check('Repairing ranking re-enables valid essay resume '+spot,()=>{
-   select(g,'rank-0','barker');select(g,'rank-1','revere1775');assert(!g.doc.getElementById('return-essay').disabled);
+   g.click('rank-sources');select(g,'rank-0','barker');select(g,'rank-1','revere1775');g.click('rank-documents');assert(!g.doc.getElementById('return-essay').disabled);
    select(g,'document','revere1798');g.click('return-essay');assert(g.ctx.WL_SLICE.valid(g.snap().run.green,'essay'));
  });
  check('Document visit and typing shortcuts preserve draft '+spot,()=>{assert.equal(g.doc.getElementById('essay-text').value,draft);assert.equal(g.snap().run.phase,'essay');});
@@ -190,7 +251,7 @@ for(const spot of ['corner','edge']) {
      assert.equal(h.snap().run.phase,'hypothesis');assert.equal(h.snap().run.green.essay,run.green.essay);
      assert.equal(JSON.stringify(h.snap().run.visited),JSON.stringify(run.visited));assert.equal(JSON.stringify(h.snap().run.dawn),JSON.stringify(run.dawn));
      for(const k of ['rank','inspected','limitation','belief','hypothesis'])assert.equal(JSON.stringify(h.snap().run.green[k]),JSON.stringify(run.green[k]));
-     h.click('check-hypothesis');assert(!h.doc.getElementById('write-essay'));
+     hypothesisSteps(h);h.click('check-hypothesis');assert(!h.doc.getElementById('write-essay'));
      select(h,'aftermath','fewshots');h.click('check-hypothesis');h.click('write-essay');
      assert.equal(h.doc.getElementById('essay-text').value,run.green.essay);
      const resumed=reload(h);assert.equal(resumed.snap().run.phase,'essay');assert.equal(resumed.snap().run.green.essay,run.green.essay);

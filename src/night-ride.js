@@ -7,6 +7,7 @@
   host.classList.add('wl');
   var W = window.WGWorld.create(host), lex = W.makeLex(), night = W.makeNight();
   W.canvas.setAttribute('aria-label', 'Low-poly Lexington scene. Use labeled travel buttons or WASD to ride or walk.');
+  W.canvas.setAttribute('tabindex', '-1');
   var state = fresh(), saved = readSave(), slice;
   var S = window.WL_SLICE;
   function later() { return S.phases.includes(state.phase); }
@@ -115,7 +116,6 @@
   studyNotice.setAttribute('role', 'status'); overlay.appendChild(card); host.appendChild(overlay);
   var dialog = document.createElement('dialog'); host.appendChild(dialog);
   dialog.addEventListener('close', function () {
-    clearMovement();
     placeMusic();
     if (modalReturn && modalReturn.isConnected && !modalReturn.disabled && modalReturn.getClientRects().length) modalReturn.focus();
     else if (playable()) interactButton.focus();
@@ -248,17 +248,17 @@
       card.appendChild(button('Restart this run', restart, 'restart'));
     } else if (state.phase === 'dawn') {
       showCard('Dawn muster', B.caption, 'WL-S2 · Simplified reconstruction');
-      paragraph(card, 'Eli leaves the borrowed horse and continues on foot. Meet Parker, carry an invented message, and compare two listening spots in either order.');
+      paragraph(card, 'Eli leaves the borrowed horse and continues on foot. First, meet Parker at the marked stop.');
       paragraph(card, 'Learn what distance can hide. Missing words cannot tell you anyone\'s intent or who will fire first. Speech and the hearing experiment are dramatized, not historical quotations.');
       paragraph(card, 'WASD or arrows walk; drag to look; E interacts. Travel buttons assist movement. N opens the notebook; Escape pauses. There is no timer or combat.');
       card.appendChild(button('Walk to the muster', function () { yaw = 0; go('muster'); }, 'start-muster', true));
     } else if (onFoot()) {
       actionRow.hidden = false; notice.hidden = false; route.replaceChildren();
-      B.stops.forEach(function (s) {
+      B.stops.filter(function (s) { return objectiveStops().includes(s.id); }).forEach(function (s) {
         var b = button('Walk to ' + s.name, function () {
           target = { x: s.x, z: s.z }; feedback.textContent = 'Walking to ' + s.name + '. Movement keys cancel assistance.';
         }, 'travel-' + s.id);
-        b.disabled = !state.dawn.met && s.id !== 'parker'; route.appendChild(b);
+        route.appendChild(b);
       });
       updateObjective(); updateInteraction();
     } else if (state.phase === 'muster-complete') {
@@ -286,8 +286,10 @@
     if (onFoot()) {
       var d = state.dawn;
       setText(objective, !d.met ? 'Meet Parker at the marked stop. Speech is dramatized. [FORMATION] [COMMAND]' :
-        musterDone() ? 'Find the spectator boundary and record the limits of what you heard.' :
-        'Deliver the message ' + (d.delivered ? '(done)' : '(pending)') + '; compare listening spots ' + d.listened.length + '/2; ask both fictional witnesses ' + d.questions.length + '/2. [COMMAND]');
+        !d.delivered ? 'Deliver Parker\'s invented message to the marked fictional militiaman.' :
+        d.listened.length < 2 ? 'Message delivered. Compare the listening spots. Recorded ' + d.listened.length + '/2. [COMMAND]' :
+        d.questions.length < 2 ? 'Ask the fictional witnesses about their reports. Asked ' + d.questions.length + '/2.' :
+        'Find the spectator boundary and record the limits of what you heard.');
       return;
     }
     setText(objective, !state.accepted ? 'Meet Revere at the parsonage. This encounter is dramatized. [NIGHT]' :
@@ -303,10 +305,10 @@
     if (!onFoot()) return [];
     var d = state.dawn;
     if (!d.met) return ['parker'];
-    if (musterDone()) return d.boundary ? [] : ['boundary'];
-    return ['militia', 'near', 'far', 'town'].filter(function (id) {
-      return id === 'militia' ? !(d.delivered && d.questions.includes(id)) : id === 'town' ? !d.questions.includes(id) : !d.listened.includes(id);
-    });
+    if (!d.delivered) return ['militia'];
+    if (d.listened.length < 2) return ['near', 'far'].filter(function (id) { return !d.listened.includes(id); });
+    if (d.questions.length < 2) return ['militia', 'town'].filter(function (id) { return !d.questions.includes(id); });
+    return d.boundary ? [] : ['boundary'];
   }
   function nearby() {
     if (onFoot()) return B.stops.find(function (s) { return Math.hypot(state.dawn.x - s.x, state.dawn.z - s.z) < 1.6; });
@@ -333,14 +335,14 @@
     sourceNote(dialog, s.id === 'parsonage' ? 'Dramatized dialogue. These are invented words, not a quotation.' : 'Fictional character · Dramatized dialogue.', s.id === 'parsonage' ? '[NIGHT]' : '');
     paragraph(dialog, s.id === 'parsonage' ? D.revere[0] : D.resident);
     if (s.id === 'parsonage') {
-      var answer = el('p');
-      dialog.appendChild(button('Who told you?', function () {
-        state.asked = true; answer.textContent = D.revere[1] + ' · Dramatized dialogue'; save();
-      }, 'ask-source')); dialog.appendChild(answer);
-      paragraph(dialog, 'Fictional errand: borrow this horse, carry the warning to the Lantern and Orchard households, then return here. You are not retracing Revere\'s historical ride.');
-      dialog.appendChild(button(state.accepted ? 'Continue the errand' : 'Accept the alarm errand', function () {
-        state.accepted = true; dialog.close(); updateObjective(); render(); save();
-      }, 'accept', true));
+      if (!state.asked) {
+        dialog.appendChild(button('Who told you?', function () {
+          state.asked = true; save(); dialog.close(); interact();
+        }, 'ask-source', true));
+      } else {
+        paragraph(dialog, D.revere[1] + ' · Dramatized dialogue');
+        dialog.appendChild(button('Hear the errand', revereErrand, 'hear-errand', true));
+      }
     } else {
       paragraph(dialog, 'Eli passes on the warning heard at the parsonage. Eli has not seen the column. This exchange is invented.');
       dialog.appendChild(button(state.visited.includes(s.id) ? 'Already recorded · continue' : 'Record the alarm and continue', function () {
@@ -348,6 +350,15 @@
         dialog.close(); updateObjective(); save();
       }, 'record-alarm', true));
     }
+    closeControl();
+  }
+  function revereErrand() {
+    dialog.close(); openDialog('The alarm errand');
+    sourceNote(dialog, 'Fictional gameplay. Not Revere\'s historical ride.', '');
+    paragraph(dialog, 'Borrow this horse, carry the warning to the Lantern and Orchard households, then return here.');
+    dialog.appendChild(button(state.accepted ? 'Continue the errand' : 'Accept the alarm errand', function () {
+      state.accepted = true; dialog.close(); render(); save();
+    }, 'accept', true));
     closeControl();
   }
   function interactDawn() {
@@ -358,7 +369,7 @@
       sourceNote(dialog, 'Dramatized dialogue. Invented words, not a quotation.', '[FORMATION] [COMMAND]');
       paragraph(dialog, B.parker);
       paragraph(dialog, 'Fictional errand: carry a reminder to the marked militiaman to listen for orders. Eli does not cause any historical order or outcome.');
-      dialog.appendChild(button(d.met ? 'Continue the muster' : 'Accept the message', function () { d.met = true; dialog.close(); render(); save(); }, 'accept-message', true));
+      dialog.appendChild(button(d.met ? 'Continue the muster' : 'Accept the message', function () { clearMovement(); d.met = true; modalReturn = W.canvas; dialog.close(); render(); save(); }, 'accept-message', true));
     } else if (s.id === 'near' || s.id === 'far') {
       sourceNote(dialog, 'Dramatized hearing experiment. Displayed text represents hearing; this scene is silent.', '[COMMAND]');
       paragraph(dialog, B.hearing[s.id]);
@@ -369,23 +380,27 @@
       }, 'record-listening', true));
     } else if (s.id === 'militia' || s.id === 'town') {
       sourceNote(dialog, 'Fictional character · Dramatized dialogue. Not historical testimony.', '');
-      if (s.id === 'militia') {
-        paragraph(dialog, d.delivered ? 'You have already delivered the invented message.' : 'Pass on the reminder to listen for orders. This message relay is invented.');
-        var deliver = button(d.delivered ? 'Message already delivered' : 'Deliver the message', function () { d.delivered = true; save(); updateObjective(); deliver.disabled = true; deliver.textContent = 'Message already delivered'; }, 'deliver-message', true);
-        deliver.disabled = d.delivered; dialog.appendChild(deliver);
+      if (s.id === 'militia' && !d.delivered) {
+        paragraph(dialog, 'Pass on the reminder to listen for orders. This message relay is invented.');
+        dialog.appendChild(button('Deliver the message', function () {
+          d.delivered = true; dialog.close(); render(); save();
+        }, 'deliver-message', true));
+      } else if (!d.delivered || d.listened.length < 2) {
+        paragraph(dialog, !d.delivered ? 'First deliver Parker\'s invented message to the marked militiaman.' : 'Next, compare the two listening spots.');
+      } else if (d.questions.includes(s.id)) {
+        paragraph(dialog, (s.id === 'militia' ? B.militiaman : B.townsperson) + ' · Dramatized dialogue');
+      } else {
+        dialog.appendChild(button(s.id === 'militia' ? 'What could you hear?' : 'What could you see?', function () {
+          d.questions.push(s.id); save(); dialog.close(); render(); interactDawn();
+        }, 'ask-' + s.id, true));
       }
-      var answer = el('p');
-      dialog.appendChild(button(s.id === 'militia' ? 'What could you hear?' : 'What could you see?', function () {
-        answer.textContent = (s.id === 'militia' ? B.militiaman : B.townsperson) + ' · Dramatized dialogue';
-        if (!d.questions.includes(s.id)) d.questions.push(s.id); save(); updateObjective();
-      }, 'ask-' + s.id)); dialog.appendChild(answer);
     } else {
       sourceNote(dialog, 'Fictional gameplay boundary. The marked location is not a historical fact.', '');
       paragraph(dialog, 'Stay at the spectator edge. Eli has no weapon and will not join the ranks.');
       if (musterDone()) {
         paragraph(dialog, 'Compare your notebook: hearing a report or part of an instruction does not establish who fired first.');
         dialog.appendChild(button('Record the boundary and finish the muster', function () { d.boundary = true; go('muster-complete'); }, 'finish-muster', true));
-      } else paragraph(dialog, 'First deliver the message, record both listening spots, and ask both fictional witnesses. You can still visit every stop in any order.');
+      } else paragraph(dialog, objective.textContent);
     }
     closeControl();
   }
@@ -399,7 +414,7 @@
     var k = e.key.toLowerCase();
     if (dialog.open) return;
     if (k === 'tab' && !overlay.hidden) {
-      var buttons = Array.from(card.querySelectorAll('button, a[href], select, textarea, input')).filter(function (b) { return !b.disabled && b.getClientRects().length; });
+      var buttons = Array.from(card.querySelectorAll('button, a[href], select, textarea, input, summary')).filter(function (b) { return !b.disabled && b.getClientRects().length; });
       var first = buttons[0], end = buttons[buttons.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); end.focus(); }
       else if (!e.shiftKey && document.activeElement === end || !card.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
