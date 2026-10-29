@@ -124,6 +124,7 @@
   function clearMovement() { keys = {}; target = null; drag = null; }
   function openDialog(title, kind) {
     clearMovement(); modalReturn = document.activeElement; dialog.replaceChildren(); dialog.className = kind || 'talk';
+    dialog.setAttribute('aria-label', title);
     var header = el('header'); header.setAttribute('data-initial', title.charAt(0)); header.appendChild(el('h2', '', title)); dialog.appendChild(header);
     dialog.showModal();
   }
@@ -171,7 +172,8 @@
     closeControl();
   }
   function showCard(title, text, tag) {
-    card.replaceChildren(); card.className = 'card'; if (tag) paragraph(card, tag, 'tag kicker'); card.appendChild(el('h1', '', title)); paragraph(card, text);
+    card.replaceChildren(); card.className = 'card'; if (tag) paragraph(card, tag, 'tag kicker');
+    var heading = el('h1', '', title); heading.setAttribute('tabindex', '-1'); card.appendChild(heading); paragraph(card, text);
     studyNotice.textContent = notice.textContent; if (later()) card.appendChild(studyNotice);
     overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-label', title);
     card.classList.toggle('study-card', later() && modern() && !paused);
@@ -190,12 +192,17 @@
     var body = el('div', 'card-scroll'), actions = el('div', 'card-actions');
     Array.from(card.children).forEach(function (n) { (n.tagName === 'BUTTON' ? actions : body).appendChild(n); });
     card.append(body, actions);
+    card.querySelector('h1').focus();
   }
   function placeMusic() {
     var footer = dialog.open ? dialog.querySelector('.close') : !overlay.hidden ? card.querySelector('.card-actions') : tools;
     if (footer) footer.appendChild(musicButton);
   }
-  function render() { music.pause(paused); music.scene(state.phase); tools.appendChild(musicButton); draw(); splitCard(); placeMusic(); }
+  function render() {
+    var hadCardFocus = overlay.contains(document.activeElement);
+    music.pause(paused); music.scene(state.phase); tools.appendChild(musicButton); draw(); splitCard(); placeMusic();
+    if (overlay.hidden && hadCardFocus) W.canvas.focus();
+  }
   function draw() {
     panel.classList.toggle('is-caption', state.phase === 'opening');
     chapter.textContent = ['intro', 'opening', 'blackout'].includes(state.phase) ? 'Dawn of April 19 · reconstructed opening' : later() ? modern() ? 'Modern study · evidence and answer' : 'Lexington Green · reconstructed scene' : ['dawn', 'muster', 'muster-complete'].includes(state.phase) ? 'Dawn of April 19 · dramatized muster' : state.phase === 'ride' ? 'Night of April 18 · fictional errand' : 'The night alarm';
@@ -416,12 +423,14 @@
     if (k === 'tab' && !overlay.hidden) {
       var buttons = Array.from(card.querySelectorAll('button, a[href], select, textarea, input, summary')).filter(function (b) { return !b.disabled && b.getClientRects().length; });
       var first = buttons[0], end = buttons[buttons.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); end.focus(); }
-      else if (!e.shiftKey && document.activeElement === end || !card.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      if (!first) { e.preventDefault(); return; }
+      var outside = !card.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === card.querySelector('h1') || outside)) { e.preventDefault(); end.focus(); }
+      else if (!e.shiftKey && (document.activeElement === end || outside)) { e.preventDefault(); first.focus(); }
       return;
     }
     if (['TEXTAREA', 'INPUT', 'SELECT'].includes(e.target.tagName)) return;
-    if (k === 'escape') { e.preventDefault(); setPaused(!paused); return; }
+    if (k === 'escape') { e.preventDefault(); if (!e.repeat) setPaused(!paused); return; }
     if (k === 'n' && !e.repeat) { e.preventDefault(); notebook(); return; }
     if (paused || !playable() || !overlay.hidden || state.phase === 'green-event') return;
     if (movingKey(k)) { e.preventDefault(); keys[k] = true; target = null; }
@@ -440,8 +449,9 @@
   W.canvas.addEventListener('pointerup', function () { drag = null; });
   W.canvas.addEventListener('pointercancel', function () { drag = null; });
   function resize() {
-    W.renderer.setSize(host.clientWidth, host.clientHeight, false);
-    W.cam.aspect = host.clientWidth / Math.max(1, host.clientHeight); W.cam.updateProjectionMatrix();
+    var width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight);
+    W.renderer.setSize(width, height, false);
+    W.cam.aspect = width / height; W.cam.updateProjectionMatrix();
   }
   slice = S.create({ W: W, lex: lex, card: card, panel: panel, overlay: overlay, actionRow: actionRow, notice: notice,
     route: route, objective: objective, interactButton: interactButton, el: el, paragraph: paragraph, button: button, setText: setText,
@@ -519,7 +529,7 @@
         }
       }
       night.horse.position.set(state.x, 0, state.z);
-      night.legs.forEach(function (leg, i) { leg.rotation.x = dx || dz ? Math.sin(now / 140 + i * 1.6) * 0.4 : 0; });
+      night.legs.forEach(function (leg, i) { leg.rotation.x = !W.reducedMotion() && (dx || dz) ? Math.sin(now / 140 + i * 1.6) * 0.4 : 0; });
       night.rings.forEach(function (ring, i) { ring.done = state.visited.includes(D.stops[i].id); });
       W.cam.position.set(state.x + Math.sin(yaw) * 14, 10, state.z + Math.cos(yaw) * 14);
       W.labelFocus = objectiveStops(); W.cam.lookAt(state.x, 1.5, state.z - 1); W.renderer.render(night.scene, W.cam);

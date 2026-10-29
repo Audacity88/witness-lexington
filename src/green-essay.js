@@ -55,6 +55,7 @@
       Array.from(env.card.children).forEach(function (n) { body.appendChild(n); });
       env.card.append(body, actions);
       env.placeMusic();
+      env.card.querySelector('h1').focus();
     }
     function save() { env.save(); }
     function revealResult(result) {

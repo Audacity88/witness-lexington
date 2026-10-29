@@ -2,7 +2,8 @@ const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:a
 const root = require('node:path').resolve(__dirname, '..') + '/';
 const paint = new Proxy({ measureText: s => ({width:s.length*20}), createRadialGradient: () => ({addColorStop(){}}) }, {get(o,k){return k in o ? o[k] : ()=>{};}});
 const canvas = () => ({style:{},getContext:()=>paint});
-const ctx = {console,performance:{now:()=>0},document:{createElement:()=>canvas()}};ctx.window=ctx;
+const motionPreference={matches:false};
+const ctx = {matchMedia:()=>motionPreference,console,performance:{now:()=>0},document:{createElement:()=>canvas()}};ctx.window=ctx;
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(root+'vendor/three-orbit.global.js','utf8'),ctx);
 ctx.THREE = {...ctx.THREE, WebGLRenderer:class {constructor(){this.domElement=canvas();this.shadowMap={};} setPixelRatio(){}}, OrbitControls:class{}};
 vm.runInContext(fs.readFileSync(root+'src/world.js','utf8'),ctx);
@@ -11,6 +12,14 @@ const w=ctx.WGWorld.create({appendChild(){}}),lex=w.makeLex(),green=w.makeGreen(
 const blocker=green.group.children.find(o=>o.geometry?.parameters?.width===12 && o.geometry?.parameters?.height===8);
 assert(blocker,'staged obstruction exists');
 let checks=0;
+assert(!w.reducedMotion());motionPreference.matches=true;assert(w.reducedMotion());checks++;
+green.pose(10,-14,1,0,1,'green',0,'edge',0);
+const eli=green.group.children.find(o=>o.userData.legs);
+assert(eli.userData.legs.every(leg=>leg.rotation.x===0));checks++;
+motionPreference.matches=false;
+green.pose(10,-14,1,0,1,'green',0,'edge',0);
+assert(eli.userData.legs.some(leg=>Math.abs(leg.rotation.x)>0));checks++;
+
 for(const [width,height] of [[960,540],[662,418]]) for(const spot of ['corner','edge']) {
  w.cam.aspect=width/height;w.cam.updateProjectionMatrix();
  for(const t of [0,3,6,7,9.9,10,15]) {

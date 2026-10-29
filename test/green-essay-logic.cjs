@@ -5,7 +5,7 @@ class Element {
  constructor(tag, doc) { this.tagName=tag.toUpperCase(); this.doc=doc; this.children=[]; this.events={}; this._text=''; this.hidden=false; this.disabled=false; this.open=false; this.clientWidth=960; this.clientHeight=540; this.classList={add(){},toggle(){}}; }
  set textContent(t){ this._text=t; this.children=[]; } get textContent(){return this._text+this.children.map(x=>x.textContent).join('');}
  append(...nodes){nodes.forEach(n=>{n.remove();n.parent=this;this.children.push(n)});}
- remove(){if(this.parent){this.parent.children=this.parent.children.filter(n=>n!==this);this.parent=null;}} appendChild(n){this.append(n);return n;}
+ remove(){if(this.parent){if(this.contains(this.doc.activeElement)){const old=this.doc.activeElement;this.doc.activeElement=null;old.dispatch('blur');}this.parent.children=this.parent.children.filter(n=>n!==this);this.parent=null;}} appendChild(n){this.append(n);return n;}
  replaceChildren(...nodes){this._text='';this.children=[];this.append(...nodes);}
  scrollIntoView(options){this.scrolled=options;}
  setAttribute(k,v){this[k]=v;} addEventListener(k,fn){(this.events[k]??=[]).push(fn);} dispatch(k,e={}){for(const fn of this.events[k]||[]) fn(e);}
@@ -21,7 +21,7 @@ function boot(storage={}){
  const events={}, canvas=new Element('canvas',doc);host.append(canvas);let callback,now=0,cutPoses=0;
  const night={scene:{},horse:{position:{set(){}},rotation:{}},legs:Array.from({length:4},()=>({rotation:{}})),rings:Array.from({length:3},()=>({material:{color:{set(){}}}}))};
  const ctx={document:doc,console,performance:{now:()=>now},localStorage:{getItem:k=>storage[k]||null,setItem:(k,v)=>storage[k]=v,removeItem:k=>delete storage[k]},
- requestAnimationFrame:fn=>callback=fn,clearInterval(){},ResizeObserver:class{observe(){}},THREE:{},addEventListener:(k,fn)=>(events[k]??=[]).push(fn),WGWorld:{create:()=>({canvas,cam:{position:{set(){}},lookAt(){},updateProjectionMatrix(){}},renderer:{setSize(){},render(){}},makeNight:()=>night,makeLex:()=>({scene:{},regs:[],horse:{},poseCutscene(){cutPoses++}}),makeDawn:()=>({scene:{},group:{},rings:[],pose(){}}),makeGreen:()=>({group:{},pose(){}})})}};
+ requestAnimationFrame:fn=>callback=fn,clearInterval(){},ResizeObserver:class{constructor(fn){ctx.resize=fn;}observe(){}},THREE:{},addEventListener:(k,fn)=>(events[k]??=[]).push(fn),WGWorld:{create:()=>(ctx.world={canvas,reducedMotion:()=>false,cam:{position:{set(){}},lookAt(){},updateProjectionMatrix(){}},renderer:{setSize(w,h){ctx.size=[w,h];},render(){}},makeNight:()=>night,makeLex:()=>({scene:{},regs:[],horse:{},poseCutscene(){cutPoses++}}),makeDawn:()=>({scene:{},group:{},rings:[],pose(){}}),makeGreen:()=>({group:{},pose(){}})})}};
  ctx.window=ctx;vm.createContext(ctx);for(const file of ['data/night-ride.js','data/dawn-muster.js','data/evidence.js','data/essay-rules.js','data/green.js','src/evidence-check.js','src/green-essay.js','src/music.js','src/night-ride.js']){
   if(file==='src/night-ride.js'){const createMusic=ctx.WL_MUSIC;ctx.WL_MUSIC=changed=>{ctx.music=createMusic(changed);return ctx.music;};}
   vm.runInContext(fs.readFileSync(ROOT+file,'utf8'),ctx,{filename:file});
@@ -34,11 +34,53 @@ function boot(storage={}){
  function snap(){return ctx.WitnessGame.snapshot();}
  function travel(id,z){click('travel-'+id);let n=0;while(snap().assisted&&n++<800)frame(1000/21);assert(n<800,'assisted arrival');assert(Math.abs(snap().run.z-z)<0.01);click('interact');}
  function walkTo(id) { const s=ctx.WL_DAWN.stops.find(s=>s.id===id);click('travel-'+id);let n=0;while(snap().assisted&&n++<800)frame(1000/21);assert(n<800);assert(Math.hypot(snap().run.dawn.x-s.x,snap().run.dawn.z-s.z)<0.01);click('interact'); }
- return {events,storage,doc,host,click,key,release,snap,frames,frame,travel,walkTo,ctx};
+ return {events,storage,doc,host,click,key,release,snap,frames,frame,travel,walkTo,ctx,night};
 }
 function walk(n){return [n,...n.children.flatMap(walk)];}
 const checks=[];function check(name,fn){fn();checks.push(name);}
 const KEY='witness-lexington-s1-v1';
+check('Zero-size and restored hosts keep a positive finite camera aspect',()=>{
+ const game=boot();
+ for(const [width,height] of [[0,540],[960,0],[0,0],[960,540]]){
+  game.host.clientWidth=width;game.host.clientHeight=height;game.ctx.resize();
+  assert(game.ctx.world.cam.aspect>0&&Number.isFinite(game.ctx.world.cam.aspect));
+  assert.deepEqual(game.ctx.size,[Math.max(1,width),Math.max(1,height)]);
+ }
+});
+check('Overlay changes focus the new heading and gameplay restores canvas focus',()=>{
+ const game=boot();
+ assert.equal(game.doc.activeElement,game.host.querySelector('h1'));
+ game.click('begin');assert.equal(game.doc.activeElement,game.host.querySelector('canvas'));
+ game.click('skip');assert.equal(game.doc.activeElement,game.host.querySelector('h1'));
+ game.click('rewind');assert.equal(game.doc.activeElement,game.host.querySelector('h1'));
+ game.click('start-ride');assert.equal(game.doc.activeElement,game.host.querySelector('canvas'));
+});
+check('Shift Tab from the overlay heading or outside wraps to its last control',()=>{
+ const game=boot(),card=game.host.querySelector('.card');
+ const controls=card.querySelectorAll('button, a[href], select, textarea, input, summary').filter(n=>!n.disabled);
+ game.key('Tab',{shiftKey:true});assert.equal(game.doc.activeElement,controls.at(-1));
+ game.doc.activeElement=game.host;game.key('Tab',{shiftKey:true});assert.equal(game.doc.activeElement,controls.at(-1));
+ game.key('Tab');assert.equal(game.doc.activeElement,controls[0]);
+});
+check('Native dialogs are named for their visible heading',()=>{
+ const game=boot();game.click('begin');game.click('skip');game.click('black-notebook');
+ const dialog=game.host.querySelector('dialog');assert.equal(dialog['aria-label'],dialog.querySelector('h2').textContent);
+ game.click('close-dialog');game.click('rewind');game.click('start-ride');game.click('interact');
+ assert.equal(dialog['aria-label'],'Paul Revere');assert.equal(dialog['aria-label'],dialog.querySelector('h2').textContent);
+});
+check('Holding Escape pauses once until a new key press',()=>{
+ const game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');
+ game.key('Escape');assert(game.snap().paused);
+ for(let i=0;i<5;i++)game.key('Escape',{repeat:true});
+ assert(game.snap().paused);game.key('Escape');assert(!game.snap().paused);
+});
+check('Reduced motion still allows riding with decorative horse legs at rest',()=>{
+ const game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');game.click('interact');
+ game.click('ask-source');game.click('hear-errand');game.click('accept');
+ game.ctx.world.reducedMotion=()=>true;const before=game.snap().run.z;
+ game.key('w');game.frames(4);game.release('w');
+ assert(game.snap().run.z<before);assert(game.night.legs.every(leg=>leg.rotation.x===0));
+});
 check('Game Pause forwards audio pause without changing the music label',()=>{
  const game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');game.click('pause');
  assert(game.snap().paused);assert(game.ctx.music.status().paused);assert(!game.ctx.music.status().muted);
@@ -139,6 +181,7 @@ for(const spot of ['corner','edge']) {
  for(const c of g.ctx.WG_DATA.cards){select(g,'document',c.id);if(c.id==='revere1775')assert(g.host.querySelector('.card').textContent.includes('Document paraphrase: Revere says'));g.click('inspect');assert(g.doc.getElementById('inspect').disabled);assert(g.host.querySelector('.card-actions').contains(g.doc.getElementById('music')));}
  check('Both accounts and Doolittle framing inspected '+spot,()=>{assert.equal(g.snap().run.green.inspected.length,9);select(g,'document','doolittle');assert(g.host.textContent.includes('artist pictured'));const body=g.host.querySelector('.card-scroll');assert(body.children.indexOf(body.querySelector('img'))<body.children.indexOf(g.doc.getElementById('document')));assert(!g.doc.getElementById('rank-0'));});
  g.click('rank-sources');
+ check('Study substeps keep focus on their replacement heading '+spot,()=>{assert.equal(g.doc.activeElement,g.host.querySelector('h1'));});
  select(g,'rank-0','barker');select(g,'rank-1','barker');
  check('Duplicate ranking cannot continue '+spot,()=>{assert(g.doc.getElementById('rank-next').disabled);assert(!g.doc.getElementById('limitation'));assert(!g.doc.getElementById('choose-belief'));});
  select(g,'rank-1','revere1775');g.click('rank-next');assert(!g.doc.getElementById('rank-0'));assert(g.doc.getElementById('choose-belief').disabled);

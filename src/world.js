@@ -16,6 +16,8 @@
   function lerp(a, b, k) { return a + (b - a) * k; }
 
   function create(host) {
+    var motionPreference = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+    function reducedMotion() { return !!(motionPreference && motionPreference.matches); }
     var renderer = new T.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
@@ -130,7 +132,7 @@
       g.userData.legs = legs; g.userData.phase = rand() * TAU;
       return g;
     }
-    function walkLegs(p, t, speed, amp) { var a = Math.sin(t * speed + p.userData.phase) * (amp || 0.45); p.userData.legs[0].rotation.x = a; p.userData.legs[1].rotation.x = -a; }
+    function walkLegs(p, t, speed, amp) { if (reducedMotion()) { standLegs(p); return; } var a = Math.sin(t * speed + p.userData.phase) * (amp || 0.45); p.userData.legs[0].rotation.x = a; p.userData.legs[1].rotation.x = -a; }
     function standLegs(p) { p.userData.legs[0].rotation.x = p.userData.legs[1].rotation.x = 0; }
     function kneel(p, k) {             // k 0..1: lower onto one knee (no falling, no gore)
       p.position.y -= 0.42 * k; p.userData.legs[0].rotation.x = -1.35 * k; p.userData.legs[1].rotation.x = 1.0 * k; p.rotation.x = 0.12 * k;
@@ -600,7 +602,7 @@
         // the mounted officer leads the column, then rides out in front of the new line
         var hk = ease(clamp01((t - 14.6) / 4.5));
         horse.position.set(lerp(2.5, 2.2, hk), 0.05, lerp(Math.max(h, 21) - 3.2, 6.6, hk)); horse.rotation.set(0, 0, 0);
-        hlegs.forEach(function (l, j) { l.rotation.x = (marching || (hk > 0 && hk < 1)) ? Math.sin(t * 7 + j * 1.6) * 0.35 : 0; });
+        hlegs.forEach(function (l, j) { l.rotation.x = !reducedMotion() && (marching || (hk > 0 && hk < 1)) ? Math.sin(t * 7 + j * 1.6) * 0.35 : 0; });
       };
       api.poseFormed = function () { hidden.visible = false; militia.forEach(milRest); regs.forEach(regFormed);
         horse.position.set(2.2, 0.05, 6.6); horse.rotation.set(0, 0, 0); hlegs.forEach(function (l) { l.rotation.x = 0; }); };
@@ -948,7 +950,7 @@
     function project(v3, camera, w, h, out) { var p = v3.clone().project(camera || cam); out = out || {}; out.x = (p.x + 1) / 2 * w; out.y = (1 - p.y) / 2 * h; out.vis = p.z < 1; return out; }
 
     var world = {
-      renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls,
+      renderer: renderer, canvas: cv, cam: cam, camB: camB, controls: controls, reducedMotion: reducedMotion,
       makeLex: makeLex, makeNight: makeNight, makeDawn: makeDawn, makeGreen: makeGreen, LINE: LINE, head: head, snap: snap, zonePoint: zonePoint,
       globe: { scene: gScene, cam: gCam, place: placeGlobe, ensure: ensureEarthMap, paintMs: function () { return globePaintMs; } },
       pickGround: pickGround, project: project, ease: ease, clamp01: clamp01, lerp: lerp, V3: T.Vector3,

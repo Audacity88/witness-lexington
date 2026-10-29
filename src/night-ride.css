@@ -148,7 +148,7 @@
 .wl .black .card-actions { background:none; border-top:1px solid rgba(243,233,210,.35); box-shadow:none; }
 .wl .black .card button { border-color:var(--paper); box-shadow:4px 4px 0 rgba(243,233,210,.4); }
 .wl .black .card button:not(.primary) { background:#000; color:var(--paper); }
-.wl .black .card button:focus-visible { outline-color:var(--brass); }
+.wl .black .card button:focus-visible, .wl .black .card [tabindex="-1"]:focus-visible { outline-color:var(--brass); }
 
 /* ---------- dialogs ---------- */
 .wl dialog { color:var(--ink); width:min(560px,calc(100% - 28px)); max-height:calc(100% - 28px); padding:16px 22px 18px; }
@@ -312,4 +312,5 @@
 }
 @media (prefers-reduced-motion:reduce) {
   .wl button { transition:none; }
+  .wl button:hover, .wl button:active { transform:none; }
 }
