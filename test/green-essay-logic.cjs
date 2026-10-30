@@ -41,7 +41,7 @@ const checks=[];function check(name,fn){fn();checks.push(name);}
 const KEY='witness-lexington-s1-v1';
 check('Zero-size and restored hosts keep a positive finite camera aspect',()=>{
  const game=boot();
- for(const [width,height] of [[0,540],[960,0],[0,0],[960,540]]){
+ for(const [width,height] of [[0,540],[960,0],[0,0],[320,240],[1280,800],[100,100],[1,1],[2000,200],[200,2000],[960,540]]){
   game.host.clientWidth=width;game.host.clientHeight=height;game.ctx.resize();
   assert(game.ctx.world.cam.aspect>0&&Number.isFinite(game.ctx.world.cam.aspect));
   assert.deepEqual(game.ctx.size,[Math.max(1,width),Math.max(1,height)]);
@@ -73,6 +73,35 @@ check('Holding Escape pauses once until a new key press',()=>{
  game.key('Escape');assert(game.snap().paused);
  for(let i=0;i<5;i++)game.key('Escape',{repeat:true});
  assert(game.snap().paused);game.key('Escape');assert(!game.snap().paused);
+});
+check('Tab-out blur clears movement without pausing; hidden visibility pauses',()=>{
+ for(const phase of ['opening','ride']) {
+  const game=boot();game.click('begin');
+  if(phase==='ride'){game.click('skip');game.click('rewind');game.click('start-ride');}
+  game.doc.hidden=false;
+  game.doc.activeElement=null; // Focus left the last page control for browser chrome.
+  for(const fn of game.events.blur||[])fn();
+  assert(!game.snap().paused,phase+': visible blur must not pause');
+  game.frames(2); // The opening clock continues after focus leaves the document.
+  if(phase==='opening')assert(game.snap().elapsed>0);
+  for(const fn of game.doc.events.visibilitychange||[])fn();
+  assert(!game.snap().paused,phase+': visible visibilitychange must not pause');
+  game.doc.hidden=true;
+  for(const fn of game.doc.events.visibilitychange||[])fn();
+  assert(game.snap().paused,phase+': hidden visibilitychange must pause');
+  const before=game.snap().elapsed;game.frames(2);assert.equal(game.snap().elapsed,before);
+  game.doc.hidden=false;
+  for(const fn of game.doc.events.visibilitychange||[])fn();
+  assert(game.snap().paused,phase+': returning must wait for explicit Resume');
+ }
+});
+check('Blur releases held movement and assisted travel without opening Pause',()=>{
+ const game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');
+ game.click('interact');game.click('ask-source');game.click('hear-errand');game.click('accept');
+ game.key('w');for(const fn of game.events.blur||[])fn();
+ const before=game.snap().run.z;game.frames(3);assert.equal(game.snap().run.z,before);
+ game.click('travel-lantern');assert(game.snap().assisted);
+ for(const fn of game.events.blur||[])fn();assert(!game.snap().assisted);assert(!game.snap().paused);
 });
 check('Reduced motion still allows riding with decorative horse legs at rest',()=>{
  const game=boot();game.click('begin');game.click('skip');game.click('rewind');game.click('start-ride');game.click('interact');

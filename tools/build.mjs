@@ -42,7 +42,7 @@ const check = (label, s) => { const rw = (s.match(REWRITE) || []).length, sc = (
 check('bundle', bundle);
 
 const TITLE = 'Witness Lexington \u2014 The Green and the evidence';
-const shell = "<style>html,body{margin:0;height:100%;overflow:hidden}</style><div id='witness-game' style='width:100%;height:100vh;min-height:400px'></div>";
+const shell = "<style>html,body{margin:0;height:100%;overflow:hidden}</style><div id='witness-game' style='width:100%;height:100vh'></div>";
 const note = (k) => `<!-- Witness Lexington v2 (kid game). ${k}. Doolittle engraving: Yale University Art Gallery 1920.25a-d, public domain (CC0). three.js r186 MIT. -->`;
 const gz = zlib.gzipSync(Buffer.from(bundle), { level: 9 }).toString('base64');
 const loader = `<script>(async function(){var b=atob('${gz}'),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);var t=await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text();var s=document.createElement('script');s.text=t;document.body.appendChild(s);})();</script>`;

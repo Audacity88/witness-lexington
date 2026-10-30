@@ -83,14 +83,14 @@ Every surface the student reads uses one frame:
 
 - **Top left: a brand cartouche.** A small broadside panel with "Witness Lexington" in IM Fell SC at 19px and the chapter line in Caslon italic at 14px beneath it.
 - **Top right:** Notebook (navy) and Pause (parchment) buttons with hard shadows.
-- The HUD never covers the bottom strip and never scrolls.
+- The HUD never covers the bottom strip. At widths up to 420px or heights up to 300px, the HUD and bottom strip stack and the game container scrolls vertically (DQ-63). At larger sizes the HUD never scrolls.
 
 ### Captions, objectives, and subtitles: the bottom strip
 
-- A broadside panel docked to the bottom, at most 1080px wide and centred. It grows to fit its content and never needs to scroll.
+- A broadside panel docked to the bottom, at most 1080px wide and centred. It grows to fit its content. In the tiny-screen layout (DQ-63), it follows the HUD in normal flow and scrolls with the game container.
 - The objective sentence is first. Then the primary interaction button (wax) and its status text in italic, then the waypoint buttons, then the save notice in italic.
-- Waypoint buttons wrap into rows, so every waypoint is on screen at once and none is clipped. On short screens they form a grid of up to three columns, and a long waypoint name may wrap to two lines inside its 44px button. Nothing hides off to the side in a scroller.
-- The primary interaction button keeps its label on one line and is never pushed off-screen.
+- Waypoint buttons wrap into rows, so every waypoint is visible or, in the tiny-screen layout (DQ-63), scrollable into view, and none is clipped. On short screens they form a grid of up to three columns, and a long waypoint name may wrap to two lines inside its 44px button. Nothing hides off to the side in a scroller.
+- The primary interaction button keeps its label on one line at larger sizes. In the tiny-screen layout it may wrap to preserve the full label and touch target.
 - **Caption mode** applies to the opening cutscene and the Green observation. It is a narrower centred strip with the caption in Caslon italic at 19px (16px on short screens) and source tags as rubric. "Skip to rewind" or "Move to shelter" sits on the right. It reads like the caption beneath an engraving.
 
 ### Overlay cards: story beats, checkpoints, and pause

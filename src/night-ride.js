@@ -437,7 +437,9 @@
     if (k === 'e' && !e.repeat) { e.preventDefault(); interact(); }
   });
   window.addEventListener('keyup', function (e) { delete keys[e.key.toLowerCase()]; });
-  window.addEventListener('blur', function () { clearMovement(); setPaused(true); });
+  // Tab can move focus into browser chrome while the page remains visible.
+  // Clear held inputs on blur; visibilitychange owns automatic pausing.
+  window.addEventListener('blur', clearMovement);
   window.addEventListener('pagehide', save);
   document.addEventListener('visibilitychange', function () { if (document.hidden) { clearMovement(); setPaused(true); } });
   W.canvas.addEventListener('pointerdown', function (e) {

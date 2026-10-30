@@ -314,3 +314,19 @@
   .wl button { transition:none; }
   .wl button:hover, .wl button:active { transform:none; }
 }
+
+/* Tiny viewports: scroll the whole HUD rather than clip controls or shrink type.
+   Keep the canvas at the viewport size; UI content supplies the scroll extent. */
+@media (max-width:420px), (max-height:300px) {
+  .wl { overflow:auto; display:flex; flex-direction:column; }
+  .wl .top { position:relative; inset:auto; margin:8px 12px 0 8px; flex:none; flex-wrap:wrap; }
+  .wl .top > .row { flex-wrap:wrap; flex-shrink:1; min-width:0; }
+  .wl .panel, .wl .panel.is-caption {
+    position:relative; inset:auto; flex:none; flex-direction:column; align-items:stretch;
+    margin:80px 12px 12px 8px; max-height:none; overflow:visible;
+  }
+  .wl .panel > p { max-height:none; overflow:visible; }
+  .wl .panel > .row:not(.route) { flex-wrap:wrap; }
+  .wl #interact { white-space:normal; max-width:100%; }
+  .wl .panel.is-caption > .route { flex-wrap:wrap; }
+}
